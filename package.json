@@ -1,0 +1,13 @@
+{
+  "name": "duel-vault",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal Yu-Gi-Oh! card database, deck builder and new-release tracker",
+  "scripts": {
+    "test": "node tests/smoke.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.45.0",
+    "exceljs": "^4.4.0"
+  }
+}

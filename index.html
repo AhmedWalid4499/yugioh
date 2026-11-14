@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Duel Vault</title>
+  <meta name="description" content="Personal Yu-Gi-Oh! card database, deck builder and new-release tracker.">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/search">
+      <span class="brand-mark" aria-hidden="true">◆</span>
+      <span>Duel Vault</span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="#/search" data-nav="search">Card Search</a>
+      <a href="#/releases" data-nav="releases">New Releases</a>
+      <a href="#/decks" data-nav="decks">My Decks</a>
+    </nav>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-panel" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button class="modal-close" type="button" data-close aria-label="Close">×</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <footer class="footer">
+    Card data and images from the free <a href="https://ygoprodeck.com/api-guide/" target="_blank" rel="noopener">YGOPRODeck API</a>.
+    Decks and watchlists are saved in this browser only. Not affiliated with Konami.
+  </footer>
+
+  <script src="js/util.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/insights.js"></script>
+  <script src="js/decks.js"></script>
+  <script src="js/excel.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/view-search.js"></script>
+  <script src="js/view-releases.js"></script>
+  <script src="js/view-decks.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
