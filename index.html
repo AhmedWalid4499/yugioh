@@ -18,6 +18,7 @@
       <a href="#/releases" data-nav="releases">New Releases</a>
       <a href="#/decks" data-nav="decks">My Decks</a>
     </nav>
+    <div id="app-update" class="app-update" hidden></div>
   </header>
 
   <main id="view" tabindex="-1"></main>
@@ -34,10 +35,11 @@
 
   <footer class="footer">
     Card data and images from the free <a href="https://ygoprodeck.com/api-guide/" target="_blank" rel="noopener">YGOPRODeck API</a>.
-    Decks and watchlists are saved in this browser only. Not affiliated with Konami.
+    Decks and watchlists are saved on this device only. Not affiliated with Konami. · Duel Vault <span id="app-version"></span>
   </footer>
 
   <script src="js/util.js"></script>
+  <script src="js/version.js"></script>
   <script src="js/api.js"></script>
   <script src="js/insights.js"></script>
   <script src="js/decks.js"></script>
@@ -46,6 +48,7 @@
   <script src="js/view-search.js"></script>
   <script src="js/view-releases.js"></script>
   <script src="js/view-decks.js"></script>
+  <script src="js/desktop.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

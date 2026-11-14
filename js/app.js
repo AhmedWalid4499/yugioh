@@ -54,6 +54,12 @@
     }
   });
 
+  // Card pictures that fail to load (e.g. offline) fall back to a coloured placeholder.
+  document.addEventListener('error', (e) => {
+    const img = e.target;
+    if (img && img.tagName === 'IMG' && img.parentElement) img.parentElement.classList.add('img-failed');
+  }, true);
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !document.getElementById('modal').hidden) C.closeModal();
   });

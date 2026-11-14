@@ -196,7 +196,7 @@ select:disabled { opacity: .45; }
   transition: transform .12s ease, border-color .12s ease;
 }
 .card-tile:hover, .card-tile:focus-visible { transform: translateY(-2px); border-color: var(--accent); border-top-color: var(--frame, var(--accent)); outline: none; }
-.card-img { position: relative; display: block; aspect-ratio: 421 / 614; background: var(--bg-2); border-radius: 6px; overflow: hidden; }
+.card-img { position: relative; display: block; flex: none; width: 100%; aspect-ratio: 421 / 614; background: var(--bg-2); border-radius: 6px; overflow: hidden; }
 .card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .card-name { font-weight: 600; font-size: .85rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .card-sub { font-size: .75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -238,6 +238,10 @@ h2 .ban-badge { position: static; vertical-align: middle; }
   box-shadow: 0 2px 8px rgba(0,0,0,.4);
 }
 .quick-add:hover { filter: brightness(1.1); transform: scale(1.06); }
+
+/* Picture failed to load (offline): show a card-coloured placeholder instead. */
+.img-failed { background: linear-gradient(160deg, var(--frame, var(--surface-2)), var(--bg-2)) !important; }
+.img-failed img { visibility: hidden; }
 
 /* ---------- States ---------- */
 
@@ -348,7 +352,7 @@ h2 .ban-badge { position: static; vertical-align: middle; }
 .zone-empty { padding: 18px; text-align: center; border: 1px dashed var(--border); border-radius: 8px; }
 .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
 .deck-slot { display: flex; flex-direction: column; gap: 3px; }
-.slot-img { position: relative; padding: 0; border: 0; background: var(--bg-2); border-radius: 6px; overflow: hidden; cursor: pointer; aspect-ratio: 421 / 614; }
+.slot-img { position: relative; display: block; width: 100%; flex: none; padding: 0; border: 0; background: var(--bg-2); border-radius: 6px; overflow: hidden; cursor: pointer; aspect-ratio: 421 / 614; }
 .slot-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .slot-img .noimg { display: grid; place-items: center; height: 100%; padding: 4px; font-size: .7rem; }
 .qty { position: absolute; right: 3px; bottom: 3px; background: rgba(0,0,0,.8); color: #fff; font-weight: 700; font-size: .78rem; padding: 0 6px; border-radius: 6px; }
@@ -357,6 +361,14 @@ h2 .ban-badge { position: static; vertical-align: middle; }
 .slot-actions button:hover { border-color: var(--accent); }
 .problems { margin: 0; padding-left: 4px; list-style: none; color: var(--warn); }
 .problems li { margin-bottom: 4px; }
+
+/* ---------- Desktop app ---------- */
+
+.app-update { margin-left: auto; }
+.pulse { animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
+.update-dialog { max-width: 640px; }
+.update-dialog h2 { padding-right: 40px; }
 
 /* ---------- Toast ---------- */
 
