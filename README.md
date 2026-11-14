@@ -30,6 +30,16 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
   - suggestions for improving the deck
 - **Import/Export `.ydk`** files, the standard format used by YGOPRODeck, EDOPro, Dueling Book and others. You can also copy a plain-text card list.
 
+### 📊 Excel import & export
+- **Export Excel** saves your deck as an `.xlsx` sheet with **each card's picture** next to its quantity, name, section, type, stats, archetype, banlist status and full effect text, so it's handy for printing, sharing or shopping lists.
+- **Import deck** also accepts an **Excel sheet (.xlsx)** or **.csv** and builds the deck for you:
+  - Use columns headed **Qty**, **Card Name** and **Section** (Main / Extra / Side). Only *Card Name* is required.
+  - Leave *Section* blank and Extra Deck monsters are placed automatically.
+  - Name matching ignores capital letters and punctuation. Rows like `3x Dark Magician` and section headings like `Side Deck` also work.
+  - Cards that can't be matched are listed in the deck's **Notes** so you can fix them.
+  - A **Download Excel template** button gives you a ready-made sheet to fill in.
+  - Excel files exported by Duel Vault can be imported again to rebuild the same deck.
+
 ## How to open it
 
 **Option 1: on your computer.** Download the repository (Code → Download ZIP), unzip it and double-click `index.html`. Nothing to install.
@@ -44,7 +54,7 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 ## Good to know
 - The "How to use it" roles and tips come from reading the card text with rules, not from tournament data. They're a solid starting point, and the real card text is always shown next to them.
 - Set lists and archetype names are cached for a few hours to keep the app fast and respect YGOPRODeck's rate limits.
-- Card images are loaded from YGOPRODeck's image server.
+- Card images are loaded from YGOPRODeck's image server. If a picture can't be downloaded during Excel export, that cell uses an `IMAGE()` formula instead, which shows the picture in Excel 365 and Google Sheets.
 - This is a fan-made tool and isn't affiliated with Konami. Yu-Gi-Oh! is a trademark of Konami.
 
 ## For developers
@@ -55,6 +65,8 @@ Plain HTML, CSS and JavaScript, with no build step. The files:
 | `js/api.js` | YGOPRODeck API client and caching |
 | `js/insights.js` | Card role detection and usage tips |
 | `js/decks.js` | Deck storage, banlist validation, YDK import/export |
+| `js/excel.js` | Excel/CSV import and Excel export with pictures |
+| `vendor/exceljs.min.js` | [ExcelJS](https://github.com/exceljs/exceljs) 4.4.0 (MIT), loaded only when Excel features are used |
 | `js/components.js` | Card tiles and the card detail modal |
 | `js/view-*.js` | Search/Archetype, Releases/Set and Decks/Builder pages |
 | `js/app.js` | Hash router |

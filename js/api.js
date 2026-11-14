@@ -117,6 +117,50 @@
     return out;
   };
 
+  function normName(s) {
+    return String(s || '').toLowerCase().replace(/[“”″]/g, '"').replace(/[‘’]/g, "'").replace(/[^a-z0-9]+/g, '');
+  }
+
+  /* Looks up cards by name (as typed in a spreadsheet). Returns an object
+     keyed by the normalised input name. Tries exact names in batches first,
+     then a fuzzy search for anything left over. */
+  api.getCardsByNames = async function (names) {
+    const unique = Array.from(new Set(names.map((n) => String(n).trim()).filter(Boolean)));
+    const found = {};
+    const want = new Set(unique.map(normName));
+    const take = (card) => {
+      const k = normName(card.name);
+      if (want.has(k) && !found[k]) found[k] = card;
+    };
+
+    for (let i = 0; i < unique.length; i += 20) {
+      const chunk = unique.slice(i, i + 20);
+      try {
+        const res = await request('cardinfo.php', { name: chunk.join('|') });
+        (res.data || []).forEach(take);
+      } catch (e) { /* fall through to one-by-one */ }
+    }
+
+    for (const n of unique) {
+      const k = normName(n);
+      if (found[k]) continue;
+      try {
+        const res = await request('cardinfo.php', { fname: n });
+        const list = res.data || [];
+        list.forEach(take);
+        if (!found[k] && list.length) {
+          // Closest match: the shortest name that contains what was typed.
+          const hit = list.filter((c) => normName(c.name).indexOf(k) !== -1)
+            .sort((a, b) => a.name.length - b.name.length)[0];
+          if (hit) found[k] = hit;
+        }
+      } catch (e) { /* not found */ }
+    }
+    return found;
+  };
+
+  api.normName = normName;
+
   api.getArchetypeCards = async function (name) {
     const res = await request('cardinfo.php', { archetype: name });
     return res.data || [];

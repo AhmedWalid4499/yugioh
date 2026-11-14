@@ -46,11 +46,12 @@
     const decks = D.all();
     view.innerHTML = '<section class="page">' +
       '<div class="page-head row-between"><div><h1>My Decks</h1><p class="muted">Decks are saved in this browser. Export them as .ydk files to back them up or use them in simulators.</p></div>' +
-        '<div class="row"><button type="button" class="btn btn-primary" id="new-deck">+ New deck</button><button type="button" class="btn" id="import-toggle">Import .ydk</button></div></div>' +
+        '<div class="row"><button type="button" class="btn btn-primary" id="new-deck">+ New deck</button><button type="button" class="btn" id="import-toggle">Import deck</button></div></div>' +
       '<div class="panel" id="import-panel" hidden>' +
         '<h3>Import a deck</h3>' +
-        '<p class="muted small">Choose a .ydk file (from YGOPRODeck, EDOPro, Dueling Book…) or paste its contents.</p>' +
-        '<div class="row"><input type="text" id="import-name" placeholder="Deck name" aria-label="Deck name"><input type="file" id="import-file" accept=".ydk,.txt" aria-label="YDK file"></div>' +
+        '<p class="muted small">Choose an <strong>Excel sheet (.xlsx)</strong> or <strong>.csv</strong> with card names and quantities, or a <strong>.ydk</strong> file (from YGOPRODeck, EDOPro, Dueling Book…). You can also paste .ydk text below.</p>' +
+        '<div class="row"><input type="text" id="import-name" placeholder="Deck name (optional)" aria-label="Deck name"><input type="file" id="import-file" accept=".xlsx,.csv,.ydk,.txt" aria-label="Deck file"></div>' +
+        '<p class="muted small">Excel tip: use columns headed <em>Qty</em>, <em>Card Name</em> and <em>Section</em> (Main / Extra / Side). <button type="button" class="btn btn-small" id="excel-template">Download Excel template</button></p>' +
         '<textarea id="import-text" rows="6" placeholder="#main&#10;14558127&#10;…&#10;#extra&#10;…&#10;!side&#10;…" aria-label="YDK text"></textarea>' +
         '<div class="row"><button type="button" class="btn btn-primary" id="import-go">Import</button><span id="import-status" class="muted"></span></div>' +
       '</div>' +
@@ -68,7 +69,8 @@
               '<div class="row">' +
                 '<a class="btn btn-small btn-primary" href="#/deck/' + esc(d.id) + '">Edit</a>' +
                 '<button type="button" class="btn btn-small" data-dup="' + esc(d.id) + '">Duplicate</button>' +
-                '<button type="button" class="btn btn-small" data-export="' + esc(d.id) + '">Export</button>' +
+                '<button type="button" class="btn btn-small" data-export="' + esc(d.id) + '">.ydk</button>' +
+                '<button type="button" class="btn btn-small" data-excel="' + esc(d.id) + '">Excel</button>' +
                 '<button type="button" class="btn btn-small btn-danger" data-del="' + esc(d.id) + '">Delete</button>' +
               '</div>' +
             '</div></div>';
@@ -86,9 +88,25 @@
       const p = U.$('#import-panel', view);
       p.hidden = !p.hidden;
     });
+    let sheetFile = null;
+    U.$('#excel-template', view).addEventListener('click', () => {
+      App.excel.downloadTemplate().catch((err) => U.toast(err.message));
+    });
     U.$('#import-file', view).addEventListener('change', (e) => {
       const file = e.target.files[0];
+      sheetFile = null;
+      U.$('#import-text', view).hidden = false;
       if (!file) return;
+      if (/\.(xlsx|csv)$/i.test(file.name)) {
+        sheetFile = file;
+        U.$('#import-text', view).hidden = true;
+        U.$('#import-status', view).textContent = 'Ready to import ' + file.name + '.';
+        return;
+      }
+      if (/\.xls$/i.test(file.name)) {
+        U.$('#import-status', view).textContent = 'Old .xls files are not supported. In Excel choose File → Save As → Excel Workbook (.xlsx).';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         U.$('#import-text', view).value = reader.result;
@@ -101,8 +119,14 @@
       const status = U.$('#import-status', view);
       const btn = U.$('#import-go', view);
       btn.disabled = true;
-      status.textContent = 'Importing… fetching card details';
+      status.textContent = 'Importing… looking up cards';
       try {
+        if (sheetFile) {
+          const r = await App.excel.importFile(sheetFile, U.$('#import-name', view).value.trim());
+          U.toast('Imported ' + U.plural(r.added, 'card') + (r.notFound.length ? ' · ' + r.notFound.length + ' not found (listed in Notes)' : '') + '.');
+          location.hash = '#/deck/' + r.deck.id;
+          return;
+        }
         const res = await D.importYdk(U.$('#import-name', view).value.trim() || 'Imported Deck', U.$('#import-text', view).value);
         if (res.unknown.length) U.toast(U.plural(res.unknown.length, 'card id') + ' could not be found and were skipped.');
         location.hash = '#/deck/' + res.deck.id;
@@ -123,12 +147,32 @@
       }
       const ex = e.target.closest('[data-export]');
       if (ex) exportDeck(D.get(ex.getAttribute('data-export')));
+      const xl = e.target.closest('[data-excel]');
+      if (xl) exportExcel(D.get(xl.getAttribute('data-excel')), xl);
     });
   }
 
   function exportDeck(deck) {
     if (!deck) return;
     U.download(deck.name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '.ydk', D.toYdk(deck));
+  }
+
+  async function exportExcel(deck, btn) {
+    if (!deck) return;
+    const label = btn ? btn.textContent : '';
+    if (btn) btn.disabled = true;
+    try {
+      const res = await App.excel.exportDeck(deck, (done, total) => {
+        if (btn) btn.textContent = 'Pictures ' + done + '/' + total;
+      });
+      U.toast(res.missingPics
+        ? 'Excel file saved. ' + res.missingPics + ' picture(s) could not be downloaded and use an online image link instead.'
+        : 'Excel file saved with card pictures.');
+    } catch (e) {
+      U.toast('Excel export failed: ' + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = label; }
+    }
   }
 
   function textList(deck) {
@@ -231,6 +275,7 @@
       '<div class="page-head row-between">' +
         '<div><a class="back" href="#/decks">← My Decks</a><input class="deck-name" id="deck-name" value="' + esc(deck.name) + '" aria-label="Deck name"></div>' +
         '<div class="row">' +
+          '<button type="button" class="btn" id="deck-excel">Export Excel</button>' +
           '<button type="button" class="btn" id="deck-export">Export .ydk</button>' +
           '<button type="button" class="btn" id="deck-copy">Copy card list</button>' +
           '<button type="button" class="btn btn-ghost" id="deck-sort" title="Refresh card details & banlist status">↻ Refresh cards</button>' +
@@ -304,6 +349,7 @@
       D.save(d);
     }, 500));
     U.$('#deck-export', view).addEventListener('click', () => exportDeck(current()));
+    U.$('#deck-excel', view).addEventListener('click', (e) => exportExcel(current(), e.currentTarget));
     U.$('#deck-copy', view).addEventListener('click', async () => {
       const txt = textList(current());
       try {
