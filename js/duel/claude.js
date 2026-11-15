@@ -156,12 +156,16 @@
           await ui.pause();
           await ui.defenderWindow(duel.pendingAttack);
           if (duel.pendingAttack) duel.resolveAttack();
+          if (ui.processFlips) await ui.processFlips();
         }
         await ui.pause();
         continue;
       }
       if (step === 'battle' && a.type !== 'attack' && duel.phase === 'battle') duel.nextPhase(); // later actions happen in Main Phase 2
-      if (a.type === 'normal_summon' || a.type === 'set_monster') r = duel.normalSummon(p, a.card, a.type === 'set_monster' ? 'set' : 'atk', a.tributes || []);
+      if (a.type === 'normal_summon' || a.type === 'set_monster') {
+        r = duel.normalSummon(p, a.card, a.type === 'set_monster' ? 'set' : 'atk', a.tributes || []);
+        if (r.ok && a.type === 'normal_summon' && ui.responseWindow) { const l = duel.find(a.card); if (l) await ui.responseWindow({ type: 'summon', player: p, card: l.card, uid: a.card }); }
+      }
       else if (a.type === 'set_spell_trap') r = duel.setSpellTrap(p, a.card);
       else if (a.type === 'change_position') r = duel.changePosition(p, a.card);
       else if (a.type === 'special_summon') {
@@ -169,6 +173,7 @@
         const mats = (a.materials || []).map((u) => duel.find(u)).filter(Boolean).map((x) => x.card);
         const chk = loc && loc.zone === 'extra' && mats.length ? App.Materials.check(loc.card, mats) : { ok: true };
         r = !chk.ok ? { ok: false, message: chk.message } : duel.specialSummon(p, a.card, pos, { materials: a.materials || [], how: loc ? App.Materials.summonKind(loc.card) : 'summoned from the Extra Deck' });
+        if (r.ok && ui.responseWindow && loc) await ui.responseWindow({ type: 'summon', player: p, card: loc.card, uid: a.card });
       }
       else if (a.type === 'activate') {
         const loc = duel.find(a.card);
@@ -180,6 +185,16 @@
           if (!r.ok) continue;
         } else {
           duel.say(duel.pname(p) + ' activates the effect of ' + loc.card.name + '.', p);
+        }
+        duel.markUsed(p, loc.card);
+        if (ui.responseWindow && step !== 'response') {
+          const resp = await ui.responseWindow({ type: 'activate', player: p, card: loc.card, kind: k, plan: null, onField: k === 'monster' });
+          if (resp && resp.negated) {
+            duel.say(loc.card.name + '\'s effect is negated' + (resp.by ? ' by ' + resp.by : '') + '.');
+            if (k === 'spell' || k === 'trap') duel.finishActivation(a.card);
+            duel.changed();
+            continue;
+          }
         }
         const ops = Array.isArray(a.ops) ? a.ops : [];
         if (!ops.length && (k === 'spell' || k === 'trap')) {

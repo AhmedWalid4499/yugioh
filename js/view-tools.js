@@ -31,6 +31,7 @@
       '<div id="ab-result"></div>' +
     '</section>';
     App.characters.paintArt(view);
+    App.characters.wirePortraits(view, () => App.router());
 
     api.getArchetypes().then((list) => {
       U.$('#ab-archetypes', view).innerHTML = list.map((x) => '<option value="' + esc(x) + '">').join('');

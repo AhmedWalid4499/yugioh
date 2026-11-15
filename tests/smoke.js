@@ -308,7 +308,7 @@ function apiResponse(url) {
   for (let i = 0; i < 100; i++) {
     const st = await page.evaluate(() => { const d = App.duelSession().duel; return { a: d.active, t: d.turn, w: d.winner }; });
     if ((st.a === 0 && st.t >= 3) || st.w != null) break;
-    if (await page.locator('[data-extra]:has-text("No response")').count()) await page.click('[data-extra]:has-text("No response")');
+    if (await page.locator('[data-extra]:has-text("No response"):visible').count()) await page.click('[data-extra]:has-text("No response")');
     await page.waitForTimeout(100);
   }
   const afterBot = await page.evaluate(() => { const d = App.duelSession().duel; return { a: d.active, t: d.turn, log: d.log.map((l) => l.text).join('\n') }; });
@@ -335,7 +335,11 @@ function apiResponse(url) {
   await page.check('#duel-form [name=ai][value=bot]');
   await page.click('#duel-form button[type=submit]');
   await page.waitForSelector('.board');
-  await page.waitForFunction(() => { const d = App.duelSession().duel; return d.active === 0 || d.winner != null; }, null, { timeout: 15000 });
+  for (let i = 0; i < 150; i++) {
+    if (await page.evaluate(() => { const d = App.duelSession().duel; return d.active === 0 || d.winner != null; })) break;
+    if (await page.locator('[data-extra]:has-text("No response"):visible').count()) await page.click('[data-extra]:has-text("No response")');
+    await page.waitForTimeout(100);
+  }
   const yl = await page.evaluate(() => { const d = App.duelSession().duel; return { name: d.players[1].name, deck: d.players[1].deckName, log: d.log.map((l) => l.text).join('\n') }; });
   check(yl.name === 'Yugi' && yl.deck === 'Yugi\'s Deck' && /Yugi Muto steps up/.test(yl.log) && /Turn 1: Yugi/.test(yl.log), 'duel against Yugi with his own deck (played by the bot)');
 
@@ -348,7 +352,12 @@ function apiResponse(url) {
   await page.fill('#duel-form [name=key]', 'sk-ant-test');
   await page.click('#duel-form button[type=submit]');
   await page.waitForSelector('.board');
-  await page.waitForFunction(() => { const d = App.duelSession().duel; return d.active === 0 || d.winner != null; }, null, { timeout: 15000 });
+  // Claude's plays open your response window when you could chain (e.g. a hand trap): answer "No response".
+  for (let i = 0; i < 150; i++) {
+    if (await page.evaluate(() => { const d = App.duelSession().duel; return d.active === 0 || d.winner != null; })) break;
+    if (await page.locator('[data-extra]:has-text("No response"):visible').count()) await page.click('[data-extra]:has-text("No response")');
+    await page.waitForTimeout(100);
+  }
   const cl = await page.evaluate(() => { const d = App.duelSession().duel; return { log: d.log.map((l) => l.text).join('\n'), mons: d.monsters(1).length }; });
   check(claudeCalls.length >= 1 && claudeCalls[0].model === 'claude-opus-5-5' && claudeCalls[0].tools[0].name === 'take_actions', 'Claude opponent calls the API with the take_actions tool');
   check(/💬 Your move, duelist!/.test(cl.log) && cl.mons === 1, 'Claude\'s summon and comment show up on the board');

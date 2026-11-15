@@ -212,6 +212,73 @@ function giveHand(d, p, names) {
   await App.Bot.takeTurn(d, 1, noUi);
   check(d.players[0].lp < 8000, 'bot attacks directly when your field is empty (LP ' + d.players[0].lp + ')');
 
+  console.log('Smarter bot');
+  const B = App.Bot;
+  // Self Special Summon: Cyber Dragon only when only the opponent controls a monster.
+  d = newDuel([], [], { first: 1 });
+  giveHand(d, 1, ['Cyber Dragon']);
+  const cyber = d.players[1].hand[0];
+  check(!B._internals.canSelfSummon(d, 1, cyber), 'extender condition: no Cyber Dragon summon when the opponent has no monsters');
+  d.players[0].mz[0] = Object.assign(d.players[0].deck.pop(), { controller: 0, pos: 'atk', faceUp: true, summonTurn: 0 });
+  check(B._internals.canSelfSummon(d, 1, cyber), 'extender condition: Cyber Dragon can come out when only the opponent has a monster');
+  await B.takeTurn(d, 1, noUi);
+  check(d.monsters(1).some((m) => m.card.name === 'Cyber Dragon'), 'bot Special Summons Cyber Dragon from its hand');
+
+  // Xyz Summon from its own field.
+  d = newDuel([], [byName('Number 39: Utopia')]);
+  d.endTurn();
+  const g1 = d.players[1].deck.find((c) => c.name === 'Gemini Elf');
+  d.players[1].deck.splice(d.players[1].deck.indexOf(g1), 1);
+  d.players[1].mz[0] = Object.assign(g1, { controller: 1, pos: 'atk', faceUp: true, summonTurn: 0 });
+  giveHand(d, 1, ['Gemini Elf']);
+  await B.takeTurn(d, 1, noUi);
+  check(d.monsters(1).some((m) => m.card.name === 'Number 39: Utopia' && m.card.materials.length === 2), 'bot Xyz Summons Utopia using 2 Level 4 monsters (materials attached)');
+
+  // Battle: the weakest attacker that still wins is used, and no suicide attacks.
+  d = newDuel([], []);
+  d.endTurn();
+  const put = (p, name, i, pos) => { const c = Object.assign({}, d.players[p].deck[0], { uid: 'bt' + p + i, name: name, id: byName(name).id, data: byName(name), controller: p, pos: pos || 'atk', faceUp: true, summonTurn: 0, attacked: false, materials: [] }); d.players[p].mz[i] = c; return c; };
+  put(1, 'Summoned Skull', 0); put(1, 'Gemini Elf', 1);
+  const mine1 = put(0, 'Lunalight Yellow Marten', 0); // 1700 ATK
+  d.players[1].hand = [];
+  const bLog = d.log.length;
+  await (async () => { const ui2 = Object.assign({}, noUi); await B.takeTurn(d, 1, ui2); })();
+  const attacks = d.log.slice(bLog).map((l) => l.text).filter((t) => / attacks /.test(t));
+  check(attacks.length >= 1 && /^Gemini Elf attacks Lunalight Yellow Marten/.test(attacks[0]), 'bot uses its weakest winning attacker (Gemini Elf 1900) on your 1700 monster first');
+  check(!d.find(mine1.uid) || d.find(mine1.uid).zone === 'gy', 'your monster is destroyed in battle');
+
+  // Responses: Ash Blossom against your search; Bottomless Trap Hole against your summon.
+  d = newDuel([], []);
+  giveHand(d, 1, ['Ash Blossom & Joyous Spring']);
+  const searchSpell = { uid: 'ev1', name: 'Search Spell', data: { type: 'Spell Card', desc: 'Add 1 monster from your Deck to your hand.' } };
+  const r1 = await B.respondToActivation(d, 1, { type: 'activate', player: 0, card: searchSpell, kind: 'spell', plan: { choose: { fromDeck: true, pool: ['x'] }, ops: [] } });
+  check(r1.negated && r1.by === 'Ash Blossom & Joyous Spring' && d.players[1].gy.some((c) => c.name === 'Ash Blossom & Joyous Spring'), 'bot chains Ash Blossom to negate your search (Ash goes to its GY)');
+  const r2 = await B.respondToActivation(d, 1, { type: 'activate', player: 0, card: { uid: 'ev2', name: 'Pot', data: { type: 'Spell Card', desc: 'Draw 2 cards.' } }, kind: 'spell', plan: { ops: [{ op: 'draw', count: 2 }] } });
+  check(!r2.negated, 'bot does not waste negation on cards it cannot stop');
+  d.endTurn(); d.endTurn();
+  const bth = d.players[1].deck.find((c) => c.name === 'Bottomless Trap Hole') || Object.assign({}, d.players[1].deck[0], { uid: 'bth', name: 'Bottomless Trap Hole', id: byName('Bottomless Trap Hole').id, data: byName('Bottomless Trap Hole') });
+  if (d.players[1].deck.indexOf(bth) !== -1) d.players[1].deck.splice(d.players[1].deck.indexOf(bth), 1);
+  d.players[1].st[0] = Object.assign(bth, { faceUp: false, setTurn: 1 });
+  const big = put(0, 'Summoned Skull', 2);
+  const r3 = await B.respondToSummon(d, 1, { type: 'summon', player: 0, uid: big.uid });
+  check(r3.by === 'Bottomless Trap Hole' && d.players[0].banished.some((c) => c.uid === big.uid), 'bot springs Bottomless Trap Hole on your 2500 ATK summon (banished)');
+
+  // FLIP effects resolve after the flip; once-per-turn tracking resets each turn.
+  d = newDuel([], []);
+  d.endTurn(); d.endTurn();
+  const bug = put(1, 'Man-Eater Bug', 0, 'def'); bug.faceUp = false;
+  const myAtk = put(0, 'Summoned Skull', 0);
+  d.nextPhase();
+  d.declareAttack(0, myAtk.uid, bug.uid); d.resolveAttack();
+  check(d.pendingFlips.length === 1, 'flipping Man-Eater Bug queues its FLIP effect');
+  await B.resolveFlips(d);
+  check(!d.monsters(0).length, 'Man-Eater Bug\'s FLIP effect destroys your monster');
+  const optCard = put(0, 'Lunalight Yellow Marten', 1);
+  d.markUsed(0, optCard);
+  check(d.usedThisTurn(0, optCard), 'once-per-turn effects are tracked');
+  d.endTurn();
+  check(!d.usedThisTurn(0, optCard), '…and reset at the start of the next turn');
+
   console.log('Claude opponent');
   const calls = [];
   global.fetch = async (url, init) => {

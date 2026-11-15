@@ -90,6 +90,9 @@
     view.innerHTML = '<section class="page">' +
       '<div class="page-head"><h1>Duel</h1><p class="muted">Test your deck in a practice duel against the built-in bot or a Claude AI opponent.</p></div>' +
       (decks.length ? '' : '<div class="panel"><p>You need a deck first. <a class="btn btn-primary" href="#/build">⚡ Auto-build one</a> or <a href="#/decks">create one</a>.</p></div>') +
+      '<div class="panel you-pic"><div class="row">' + App.characters.avatar('you', 'big') + '<div><strong>Your picture</strong><p class="muted small">Shown next to your name in duels. Saved on this device only.</p>' +
+        '<label class="btn btn-small">📷 Choose a picture<input type="file" accept="image/*" data-portrait="you" hidden></label>' +
+        (App.characters.portrait('you') ? ' <button type="button" class="btn btn-small btn-ghost" data-portrait-clear="you">Remove</button>' : '') + '</div></div></div>' +
       '<div class="panel"><h3>Choose your opponent</h3><p class="muted small">Duel a famous duelist with a modern version of their deck (built from the newest cards in the database), or pick any deck below.</p>' +
         App.characters.tiles(oppSel.indexOf('__char:') === 0 ? oppSel.slice(7) : null) + '</div>' +
       '<form class="panel duel-setup" id="duel-form" autocomplete="off">' +
@@ -121,6 +124,7 @@
 
     const form = U.$('#duel-form', view);
     App.characters.paintArt(view);
+    App.characters.wirePortraits(view, () => App.router());
     view.addEventListener('click', (e) => {
       const t = e.target.closest('[data-char]');
       if (!t) return;
@@ -202,7 +206,7 @@
     duel.log.unshift({ turn: 0, text: (setup.first === 'coin' ? 'Coin toss: ' : '') + (first === 0 ? 'You go' : oppSpec.playerName + ' goes') + ' first. Format: ' + fmt.label + '.' });
     if (character) duel.log.unshift({ turn: 0, text: character.name + ' steps up with ' + character.style.charAt(0).toLowerCase() + character.style.slice(1).replace(/\.$/, '') + (setup.ai === 'claude' ? ' (played by Claude).' : ' (played by the built-in bot).') });
     if (mine.main.length < fmt.main[0]) duel.log.unshift({ turn: 0, text: 'Note: your deck is below the ' + fmt.label + ' minimum (' + fmt.main[0] + ') — fine for practice.' });
-    session = { duel: duel, oppType: setup.ai, reveal: false, busy: false, status: '', resolving: null, setup: setup };
+    session = { duel: duel, oppType: setup.ai, reveal: false, busy: false, status: '', resolving: null, setup: setup, character: character ? character.id : null };
   }
 
   /* ---------- the board ---------- */
@@ -214,13 +218,18 @@
     }
     const s = session;
     const duel = s.duel;
-    const speed = Number(U.store.get('dv-duel-speed', 450));
+    const SPEEDS = { slow: 800, normal: 450, fast: 150 };
+    let speed = U.store.get('dv-duel-speed', 450);
+    if (typeof speed === 'string') speed = SPEEDS[speed] != null ? SPEEDS[speed] : Number(speed);
+    speed = isNaN(Number(speed)) ? 450 : Number(speed);
 
     const ui = {
       pause: (ms) => new Promise((r) => setTimeout(r, ms == null ? speed : Math.min(ms, speed))),
       status: (t) => { s.status = t; const box = document.getElementById('duel-status'); if (box) box.textContent = t; },
       error: (m) => U.toast(m),
-      defenderWindow: (pending) => defendAgainst(pending)
+      defenderWindow: (pending) => defendAgainst(pending),
+      responseWindow: (ev) => yourResponse(ev),
+      processFlips: () => processFlips()
     };
     s.ui = ui;
 
@@ -264,6 +273,7 @@
       const pl = duel.players[p];
       const mine = p === 0;
       return '<div class="pinfo ' + (mine ? 'me' : 'opp') + (duel.active === p ? ' active' : '') + '">' +
+        (mine ? App.characters.avatar('you') : s.character ? App.characters.avatar(s.character) : '<span class="avatar avatar-you" style="--ring:#3fb6ff">' + (s.oppType === 'claude' ? '✦' : '🤖') + '</span>') +
         '<div class="pname"><strong>' + esc(pl.name) + '</strong><span class="muted small">' + esc(pl.deckName) + '</span></div>' +
         '<div class="lp-box"' + (mine ? '' : ' data-drop="opp-lp"') + '><div class="lp' + (pl.lp <= duel.format.lp / 4 ? ' low' : '') + '" id="lp-' + p + '">' + pl.lp + '<small>LP</small></div>' +
           '<div class="lp-bar"><span style="width:' + Math.max(0, Math.min(100, pl.lp / duel.format.lp * 100)) + '%"></span></div></div>' +
@@ -328,6 +338,11 @@
               '<button type="button" class="btn btn-small" data-tool="lp">Change LP</button>' +
               '<button type="button" class="btn btn-small" data-tool="reveal">' + (s.reveal ? 'Hide' : 'Reveal') + ' opponent\'s hand</button>' +
               '<button type="button" class="btn btn-small btn-ghost" data-tool="new">New duel</button>' +
+              (duel.winner == null ? '<button type="button" class="btn btn-small btn-danger" data-tool="surrender">🏳 Surrender</button>' : '') +
+            '</div>' +
+            '<div class="duel-settings">' +
+              '<label>Ask me to respond <select id="set-respond"><option value="auto"' + (U.store.get('dv-respond', 'auto') === 'auto' ? ' selected' : '') + '>When I can</option><option value="always"' + (U.store.get('dv-respond', 'auto') === 'always' ? ' selected' : '') + '>Always</option><option value="never"' + (U.store.get('dv-respond', 'auto') === 'never' ? ' selected' : '') + '>Never</option></select></label>' +
+              '<label>Duel speed <select id="set-speed"><option value="slow"' + (speed === 800 ? ' selected' : '') + '>Slow</option><option value="normal"' + (speed === 450 ? ' selected' : '') + '>Normal</option><option value="fast"' + (speed <= 150 ? ' selected' : '') + '>Fast</option></select></label>' +
             '</div>' +
             '<div class="sound-box"><button type="button" class="btn btn-small" data-tool="sound" aria-pressed="' + App.sound.isOn() + '">' + (App.sound.isOn() ? '🔊 Sound on' : '🔇 Sound off') + '</button>' +
               '<input type="range" id="sound-vol" min="0" max="1" step="0.05" value="' + App.sound.volume() + '" aria-label="Volume"' + (App.sound.isOn() ? '' : ' disabled') + '></div>' +
@@ -338,6 +353,7 @@
         (duel.winner != null ? '<div class="winner-banner"><h2>' + (duel.winner === 0 ? '🏆 You win!' : '💀 ' + esc(duel.pname(1)) + ' wins') + '</h2><div class="row"><button type="button" class="btn btn-primary" id="rematch">Rematch</button><a class="btn" href="#/duel">New setup</a></div></div>' : '');
       const log = U.$('#duel-log', root);
       if (log) log.scrollTop = log.scrollHeight;
+      App.characters.paintArt(root);
       flushFx();
       maybeOpponentTurn();
     }
@@ -552,6 +568,7 @@
       const pos = await ask('Position', '', [{ label: 'Attack', value: 'atk', primary: true }, { label: 'Defense', value: 'def' }]);
       if (!pos) return;
       const r = duel.specialSummon(0, c.uid, pos, { how: 'effect', zone: zone });
+      if (r.ok) await opponentRespondsToSummon(c);
       if (!r.ok) U.toast(r.message);
     }
 
@@ -623,10 +640,123 @@
     }
 
     async function activateFlow(uid, ctx, zoneIndex) {
+      const pre = duel.find(uid);
+      if (pre && !(await oncePerTurnOk(pre.card))) return;
       const r = duel.activateSpellTrap(0, uid, zoneIndex);
       if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); return; }
+      duel.markUsed(0, r.card);
       const pf = App.Effects.plan(duel, 0, r.card, ctx);
+      if (await negatedByOpponent(r.card, pf, false)) { duel.finishActivation(r.card.uid); return; }
       await resolveEffect(r.card, pf, true, ctx);
+    }
+
+    /* A monster effect you activate (from hand, field or GY). */
+    async function monsterEffectFlow(c) {
+      if (!(await oncePerTurnOk(c))) return;
+      const loc = duel.find(c.uid);
+      duel.say('You activate ' + c.name + '\'s effect' + (loc && loc.zone === 'gy' ? ' in the GY' : loc && loc.zone === 'hand' ? ' from your hand' : '') + '.', 0);
+      duel.fx('activate', { uid: c.uid, player: 0, kind: 'monster' });
+      duel.markUsed(0, c);
+      const pf = App.Effects.plan(duel, 0, c, { summoned: true });
+      if (await negatedByOpponent(c, pf, loc && (loc.zone === 'mz' || loc.zone === 'emz'))) return;
+      await resolveEffect(c, pf, false);
+    }
+
+    async function oncePerTurnOk(c) {
+      if (!duel.isOncePerTurn(c) || !duel.usedThisTurn(0, c)) return true;
+      const go = await ask('Once per turn', '<p>You already used ' + esc(c.name) + '\'s effect this turn. Its text says it can only be used once per turn.</p>',
+        [{ label: 'Cancel', value: false, primary: true }, { label: 'Activate anyway (another effect allows it)', value: true }]);
+      return !!go;
+    }
+
+    /* Gives the opponent a chance to chain to your activation. True if they negated it. */
+    async function negatedByOpponent(card, pf, onField) {
+      const ev = { type: 'activate', player: 0, card: card, kind: duel.kind(card), plan: pf, onField: !!onField };
+      s.busy = true;
+      let resp = {};
+      try {
+        resp = (await App.Bot.respondToActivation(duel, 1, ev)) || {};
+      } finally { s.busy = false; }
+      if (resp.negated) {
+        duel.say(card.name + '\'s effect is negated by ' + resp.by + '.');
+        App.sound.play('invalid');
+        render();
+        await ask(duel.pname(1) + ' responds!', '<p><strong>' + esc(resp.by) + '</strong> negates ' + esc(card.name) + '.</p>', [{ label: 'OK', value: true, primary: true }]);
+        return true;
+      }
+      return false;
+    }
+
+    async function opponentRespondsToSummon(c) {
+      s.busy = true;
+      try {
+        const r = (await App.Bot.respondToSummon(duel, 1, { type: 'summon', player: 0, uid: c.uid })) || {};
+        if (r.by) { render(); await ask(duel.pname(1) + ' responds!', '<p>' + esc(duel.pname(1)) + ' activates <strong>' + esc(r.by) + '</strong> against ' + esc(c.name) + '.</p>', [{ label: 'OK', value: true, primary: true }]); }
+      } finally { s.busy = false; }
+    }
+
+    /* The opponent activated something or summoned: can you respond? */
+    async function yourResponse(ev) {
+      const mode = U.store.get('dv-respond', 'auto');
+      if (mode === 'never' || duel.winner != null) return {};
+      const options = duel.spellsTraps(0).map((x) => x.card).filter((c) => !c.faceUp && c.setTurn != null && c.setTurn < duel.turn &&
+        (duel.kind(c) === 'trap' || /Quick-Play/.test(c.data.race || '')))
+        .concat(duel.players[0].hand.filter((c) => (duel.kind(c) === 'trap' && /activate this card from your hand/i.test(c.data.desc || '')) ||
+          (duel.kind(c) === 'monster' && /quick effect/i.test(c.data.desc || '') && /(discard this card|send this card from your hand|banish this card from your hand)/i.test(c.data.desc || ''))))
+        .concat(duel.monsters(0).map((m) => m.card).filter((c) => c.faceUp && /quick effect/i.test(c.data.desc || '')));
+      if (!options.length && mode !== 'always') return {};
+      render();
+      const what = ev.type === 'summon'
+        ? duel.pname(ev.player) + ' summoned ' + ev.card.name
+        : duel.pname(ev.player) + ' activates ' + ev.card.name;
+      const pick = await choose(what + ' — respond?', options, {
+        note: options.length ? 'Chain a card, or let it resolve. (Change when you are asked in the side panel.)' : 'You have nothing to respond with.',
+        extra: [{ label: 'No response', value: [] }],
+        sub: (c) => { const z = duel.find(c.uid).zone; return z === 'hand' ? 'from hand' : z === 'mz' || z === 'emz' ? 'on field' : 'Set'; }
+      });
+      if (!pick || !pick.length) return {};
+      const loc = duel.find(pick[0]);
+      const c = loc.card;
+      const ctx = ev.type === 'summon' ? { summon: ev.uid } : { activation: ev };
+      let pf;
+      if (duel.kind(c) === 'monster') {
+        if (loc.zone === 'hand') duel.sendTo(c.uid, 'gy', 'activated from the hand');
+        duel.say('You activate ' + c.name + '.', 0);
+        duel.fx('activate', { uid: c.uid, player: 0, kind: 'monster' });
+        pf = App.Effects.plan(duel, 0, c, ctx);
+      } else {
+        const r = duel.activateSpellTrap(0, c.uid);
+        if (!r.ok) { U.toast(r.message); return {}; }
+        pf = App.Effects.plan(duel, 0, c, ctx);
+      }
+      duel.markUsed(0, c);
+      const negates = pf && pf.negateActivation;
+      const choice = await ask('Resolve ' + c.name, descHtml(c), [].concat(
+        pf && (pf.ops.length || pf.negateActivation) ? [{ label: 'Auto-resolve: ' + pf.summary, value: 'auto', primary: true }] : [],
+        ev.type === 'activate' ? [{ label: 'It negates ' + ev.card.name, value: 'negate' }] : [],
+        [{ label: 'Resolve manually', value: 'manual' }]));
+      if (choice === 'auto') App.Effects.run(duel, 0, pf);
+      if (duel.kind(c) !== 'monster') duel.finishActivation(c.uid);
+      if (choice === 'manual') { s.resolving = { uid: c.uid, name: c.name, isST: false }; render(); }
+      return { negated: choice === 'negate' || (choice === 'auto' && negates), by: c.name };
+    }
+
+    /* FLIP effects of monsters that were just flipped face-up. */
+    async function processFlips() {
+      while (duel.pendingFlips.length) {
+        const uid = duel.pendingFlips.shift();
+        const loc = duel.find(uid);
+        if (!loc || (loc.zone !== 'mz' && loc.zone !== 'emz')) continue;
+        const owner = loc.card.controller != null ? loc.card.controller : loc.card.owner;
+        if (owner === 0) {
+          const pf = App.Effects.plan(duel, 0, loc.card, { flip: true, summoned: true });
+          duel.say(loc.card.name + '\'s FLIP effect activates.', 0);
+          await resolveEffect(loc.card, pf, false);
+        } else {
+          duel.pendingFlips.unshift(uid);
+          await App.Bot.resolveFlips(duel);
+        }
+      }
     }
 
     async function summonFlow(c, pos, zone) {
@@ -640,6 +770,8 @@
       }
       const r = duel.normalSummon(0, c.uid, pos, tributes, zone);
       if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); return; }
+      if (pos !== 'set') await opponentRespondsToSummon(c);
+      if (!duel.find(c.uid) || duel.find(c.uid).zone !== 'mz') return;
       if (pos !== 'set' && /if this card is normal (or special )?summoned/i.test(c.data.desc || '')) {
         const pf = App.Effects.plan(duel, 0, c, { summoned: true });
         if (pf) {
@@ -696,7 +828,8 @@
       const pos = /link/i.test(c.data.type || '') ? 'atk' : await ask('Position', '', [{ label: 'Attack Position', value: 'atk', primary: true }, { label: 'Defense Position', value: 'def' }]);
       if (!pos) return;
       const r = duel.specialSummon(0, c.uid, pos, { materials: mats, how: kind, zone: o.zone });
-      if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); }
+      if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); return; }
+      await opponentRespondsToSummon(c);
     }
 
     async function attackFlow(c, presetTarget) {
@@ -718,6 +851,7 @@
         else App.Bot.respondToAttack(duel, 1);
       } finally { s.busy = false; }
       if (duel.pendingAttack) duel.resolveAttack();
+      await processFlips();
       render();
     }
 
@@ -758,7 +892,7 @@
         if (k === 'monster') {
           if (main) { add('Normal Summon', () => summonFlow(c, 'atk'), true); add('Set (face-down)', () => summonFlow(c, 'set')); }
           add('Special Summon (by an effect)', async () => { const pos = await ask('Position', '', [{ label: 'Attack', value: 'atk', primary: true }, { label: 'Defense', value: 'def' }]); if (pos) { const r = duel.specialSummon(0, c.uid, pos, { how: 'effect' }); if (!r.ok) U.toast(r.message); } });
-          add('Activate effect from hand', async () => { duel.say('You activate ' + c.name + '\'s effect.', 0); await resolveEffect(c, App.Effects.plan(duel, 0, c, { summoned: true }), false); });
+          add('Activate effect from hand', () => monsterEffectFlow(c));
         } else {
           add('Activate', () => activateFlow(c.uid), true);
           if (main) add('Set', () => { const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); });
@@ -766,15 +900,15 @@
         moveSet(['hand']);
       } else if (loc.zone === 'mz' || loc.zone === 'emz') {
         if (duel.active === 0 && duel.phase === 'battle') add('Attack', () => attackFlow(c), true);
-        if (main) add(c.faceUp ? 'Change battle position' : 'Flip Summon', () => { const r = duel.changePosition(0, c.uid); if (!r.ok) U.toast(r.message); });
-        add('Activate effect', async () => { duel.say('You activate ' + c.name + '\'s effect.', 0); await resolveEffect(c, App.Effects.plan(duel, 0, c, { summoned: true }), false); });
+        if (main) add(c.faceUp ? 'Change battle position' : 'Flip Summon', async () => { const wasDown = !c.faceUp; const r = duel.changePosition(0, c.uid); if (!r.ok) { U.toast(r.message); return; } if (wasDown) { await opponentRespondsToSummon(c); await processFlips(); } });
+        add('Activate effect', () => monsterEffectFlow(c));
         add('Change ATK', () => modifyAtk(c));
         add('Destroy', () => duel.destroy(c.uid, 'you'));
         add('Turn face-down', () => duel.applyOp(0, { op: 'flip_face_down', card: c.uid }));
         moveSet(['gy']);
       } else if (loc.zone === 'st' || loc.zone === 'field') {
         if (!c.faceUp) add('Activate', () => activateFlow(c.uid), true);
-        else add('Activate effect', async () => { duel.say('You activate ' + c.name + '\'s effect.', 0); await resolveEffect(c, App.Effects.plan(duel, 0, c), false); });
+        else add('Activate effect', async () => { if (!(await oncePerTurnOk(c))) return; duel.say('You activate ' + c.name + '\'s effect.', 0); duel.markUsed(0, c); const pf = App.Effects.plan(duel, 0, c); if (await negatedByOpponent(c, pf, true)) return; await resolveEffect(c, pf, false); });
         add('Destroy', () => duel.destroy(c.uid, 'you'));
         moveSet(['gy']);
       } else if (loc.zone === 'extra') {
@@ -783,6 +917,7 @@
         add('Banish', () => duel.sendTo(c.uid, 'banished'));
       } else {
         // gy, banished, deck
+        if (loc.zone === 'gy' && /(in your gy|from your gy|this card is in your (gy|graveyard)|banish this card from your gy)/i.test(c.data.desc || '')) add('Activate its effect in the GY', () => monsterEffectFlow(c), true);
         if (k === 'monster' && !duel.isExtra(c)) add('Special Summon', async () => { const pos = await ask('Position', '', [{ label: 'Attack', value: 'atk', primary: true }, { label: 'Defense', value: 'def' }]); if (pos) { const r = duel.specialSummon(0, c.uid, pos, { how: 'effect' }); if (!r.ok) U.toast(r.message); } }, true);
         if (k === 'monster' && duel.isExtra(c) && loc.zone !== 'deck') add('Special Summon', () => duel.specialSummon(0, c.uid, 'atk', { how: 'effect' }), true);
         if (k !== 'monster' && loc.zone !== 'deck') add('Set it on the field', () => { duel.sendTo(c.uid, 'hand', false); const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); });
@@ -837,6 +972,10 @@
     }
 
     root.addEventListener('input', (e) => { if (e.target.id === 'sound-vol') App.sound.setVolume(e.target.value); });
+    root.addEventListener('change', (e) => {
+      if (e.target.id === 'set-respond') U.store.set('dv-respond', e.target.value);
+      if (e.target.id === 'set-speed') { U.store.set('dv-duel-speed', e.target.value); speed = SPEEDS[e.target.value]; }
+    });
     root.addEventListener('click', async (e) => {
       const t = e.target;
       if (t.closest('#resolve-done')) {
@@ -858,6 +997,10 @@
         if (what === 'lp') await changeLp();
         if (what === 'reveal') s.reveal = !s.reveal;
         if (what === 'sound') App.sound.toggle();
+        if (what === 'surrender') {
+          const sure = await ask('Surrender?', '<p>You will lose this duel.</p>', [{ label: 'Keep playing', value: false, primary: true }, { label: 'Surrender', value: true }]);
+          if (sure) duel.surrender(0);
+        }
         if (what === 'new') { location.hash = '#/duel'; return; }
         duel.changed();
         return;
