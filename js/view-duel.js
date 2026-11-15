@@ -16,9 +16,12 @@
   function dialog(html, wire) {
     return new Promise((resolve) => {
       C.openModal('<div class="duel-dialog">' + html + '</div>');
-      const body = document.getElementById('modal-body');
-      const done = (v) => { C._onClose = null; C.closeModal(); resolve(v); };
-      C._onClose = () => resolve(null);
+      // Wire events to this dialog's own element: #modal-body is shared by every
+      // dialog, so listeners on it would keep firing for later dialogs.
+      const body = document.querySelector('#modal-body .duel-dialog');
+      let settled = false;
+      const done = (v) => { if (settled) return; settled = true; C._onClose = null; C.closeModal(); resolve(v); };
+      C._onClose = () => { if (!settled) { settled = true; resolve(null); } };
       wire(body, done);
     });
   }
@@ -197,7 +200,7 @@
     let first = setup.first === 'me' ? 0 : setup.first === 'opp' ? 1 : (Math.random() < 0.5 ? 0 : 1);
     const duel = new App.Duel.Duel({ format: fmt.key, first: first, lp: Number(setup.lp) || null, decks: [meSpec, oppSpec] });
     duel.log.unshift({ turn: 0, text: (setup.first === 'coin' ? 'Coin toss: ' : '') + (first === 0 ? 'You go' : oppSpec.playerName + ' goes') + ' first. Format: ' + fmt.label + '.' });
-    if (character) duel.log.unshift({ turn: 0, text: character.name + ' steps up with ' + character.style.replace(/\.$/, '') + (setup.ai === 'claude' ? ' (played by Claude).' : ' (played by the built-in bot).') });
+    if (character) duel.log.unshift({ turn: 0, text: character.name + ' steps up with ' + character.style.charAt(0).toLowerCase() + character.style.slice(1).replace(/\.$/, '') + (setup.ai === 'claude' ? ' (played by Claude).' : ' (played by the built-in bot).') });
     if (mine.main.length < fmt.main[0]) duel.log.unshift({ turn: 0, text: 'Note: your deck is below the ' + fmt.label + ' minimum (' + fmt.main[0] + ') — fine for practice.' });
     session = { duel: duel, oppType: setup.ai, reveal: false, busy: false, status: '', resolving: null, setup: setup };
   }
@@ -224,12 +227,32 @@
     view.innerHTML = '<section class="page duel-page"><div id="duel-root"></div></section>';
     const root = U.$('#duel-root', view);
 
-    function slot(c, mine, label) {
-      if (!c) return '<div class="slot empty"><span>' + esc(label || '') + '</span></div>';
+    /* What a card can do right now (for the glow hints). */
+    function hintFor(c, zone) {
+      if (duel.active !== 0 || duel.winner != null || s.busy) return '';
+      const k = duel.kind(c);
+      const main = duel.isMain();
+      if (zone === 'hand') {
+        if (k === 'monster' && main && !duel.players[0].normalSummoned && !duel.isExtra(c) && duel.tributesNeeded(c) <= duel.monsters(0).length) return ' playable';
+        if (k === 'spell' && (main || /Quick-Play/.test(c.data.race || ''))) return ' playable';
+        if (k === 'trap' && main) return ' settable';
+        return '';
+      }
+      if ((zone === 'mz' || zone === 'emz') && duel.phase === 'battle' && c.faceUp && c.pos === 'atk' && !c.attacked) return ' ready';
+      if ((zone === 'st' || zone === 'field') && !c.faceUp && c.setTurn != null && (duel.kind(c) === 'spell' ? main || /Quick-Play/.test(c.data.race || '') : c.setTurn < duel.turn)) return ' playable';
+      return '';
+    }
+
+    /* drop: 'mz'|'st'|'field'|'emz' for empty zones (with data-index). */
+    function slot(c, mine, label, drop, index, zone) {
+      if (!c) return '<div class="slot empty' + (drop ? ' zone-' + drop : '') + '"' + (mine && drop ? ' data-drop="' + drop + '" data-index="' + index + '"' : '') + '><span>' + esc(label || '') + '</span></div>';
       const hidden = !c.faceUp && !mine;
       const monster = duel.kind(c) === 'monster';
       const isLink = /link/i.test(c.data.type || '');
-      return '<button type="button" class="slot card-slot' + (c.pos === 'def' && monster ? ' def' : '') + (!c.faceUp ? ' facedown' : '') + (mine ? ' mine' : ' theirs') + '" data-uid="' + c.uid + '" title="' + esc(hidden ? 'Face-down card' : c.name) + '">' +
+      const fieldZone = zone === 'mz' || zone === 'emz';
+      const ownedByMe = (c.controller != null ? c.controller : c.owner) === 0;
+      mine = mine && ownedByMe || (mine && zone === 'hand' && !ownedByMe ? 'peek' : mine);
+      return '<button type="button" class="slot card-slot' + (c.pos === 'def' && monster && fieldZone ? ' def' : '') + (!c.faceUp ? ' facedown' : '') + (mine ? ' mine' : ' theirs') + (mine === true ? hintFor(c, zone) : '') + (!mine && fieldZone ? ' target' : '') + '" data-uid="' + c.uid + '"' + (mine === true ? ' draggable="true"' : '') + ' title="' + esc(hidden ? 'Face-down card' : c.name) + '">' +
         (hidden ? '<span class="cardback"></span>' : '<img src="' + esc(api.image(c.data, 'small')) + '" alt="' + esc(c.name) + '">') +
         (monster && !hidden ? '<span class="stats">' + duel.atk(c) + (isLink ? '' : ' / ' + duel.def(c)) + '</span>' : '') +
         (!c.faceUp && mine ? '<span class="set-tag">SET</span>' : '') +
@@ -242,12 +265,13 @@
       const mine = p === 0;
       return '<div class="pinfo ' + (mine ? 'me' : 'opp') + (duel.active === p ? ' active' : '') + '">' +
         '<div class="pname"><strong>' + esc(pl.name) + '</strong><span class="muted small">' + esc(pl.deckName) + '</span></div>' +
-        '<div class="lp' + (pl.lp <= duel.format.lp / 4 ? ' low' : '') + '">' + pl.lp + '<small>LP</small></div>' +
+        '<div class="lp-box"' + (mine ? '' : ' data-drop="opp-lp"') + '><div class="lp' + (pl.lp <= duel.format.lp / 4 ? ' low' : '') + '" id="lp-' + p + '">' + pl.lp + '<small>LP</small></div>' +
+          '<div class="lp-bar"><span style="width:' + Math.max(0, Math.min(100, pl.lp / duel.format.lp * 100)) + '%"></span></div></div>' +
         '<div class="piles">' +
-          '<button type="button" class="pile" data-pile="deck" data-p="' + p + '">Deck ' + pl.deck.length + '</button>' +
-          '<button type="button" class="pile" data-pile="gy" data-p="' + p + '">GY ' + pl.gy.length + '</button>' +
-          '<button type="button" class="pile" data-pile="banished" data-p="' + p + '">Banished ' + pl.banished.length + '</button>' +
-          '<button type="button" class="pile" data-pile="extra" data-p="' + p + '">Extra ' + pl.extra.length + '</button>' +
+          '<button type="button" class="pile pile-deck" data-pile="deck" data-p="' + p + '"' + (mine ? ' data-drop="deck"' : '') + '>Deck <b>' + pl.deck.length + '</b></button>' +
+          '<button type="button" class="pile pile-gy" data-pile="gy" data-p="' + p + '"' + (mine ? ' data-drop="gy"' : '') + '>GY <b>' + pl.gy.length + '</b></button>' +
+          '<button type="button" class="pile pile-banished" data-pile="banished" data-p="' + p + '"' + (mine ? ' data-drop="banished"' : '') + '>Banished <b>' + pl.banished.length + '</b></button>' +
+          '<button type="button" class="pile pile-extra" data-pile="extra" data-p="' + p + '">Extra <b>' + pl.extra.length + '</b></button>' +
           (mine ? '' : '<span class="pile static">Hand ' + pl.hand.length + '</span>') +
         '</div></div>';
     }
@@ -256,10 +280,10 @@
       const pl = duel.players[p];
       const mine = p === 0;
       let cells;
-      if (kind === 'mz') cells = pl.mz.map((c) => slot(c, mine, 'Monster'));
-      else cells = pl.st.map((c) => slot(c, mine, 'Spell Trap'));
+      if (kind === 'mz') cells = pl.mz.map((c, i) => slot(c, mine, 'Monster', 'mz', i, 'mz'));
+      else cells = pl.st.map((c, i) => slot(c, mine, 'Spell Trap', 'st', i, 'st'));
       if (!mine) cells.reverse();
-      const fieldCell = kind === 'st' ? '<div class="field-zone">' + slot(pl.field, mine, 'Field') + '</div>' : '<div class="field-zone spacer"></div>';
+      const fieldCell = kind === 'st' ? '<div class="field-zone">' + slot(pl.field, mine, 'Field', 'field', 0, 'field') + '</div>' : '<div class="field-zone spacer"></div>';
       return '<div class="zones ' + kind + '">' + (mine ? '' : fieldCell) + '<div class="zone-cells">' + cells.join('') + '</div>' + (mine ? fieldCell : '') + '</div>';
     }
 
@@ -267,14 +291,18 @@
       const pl = duel.players[p];
       const mine = p === 0;
       if (!mine && !s.reveal) return '<div class="hand-row theirs">' + pl.hand.map(() => '<div class="slot hand-back"><span class="cardback"></span></div>').join('') + '</div>';
-      return '<div class="hand-row' + (mine ? ' mine' : ' theirs') + '">' + pl.hand.map((c) => slot(c, true)).join('') + '</div>';
+      const n = pl.hand.length;
+      return '<div class="hand-row' + (mine ? ' mine' : ' theirs') + '"' + (mine ? ' data-drop="hand"' : '') + '>' + pl.hand.map((c, i) => {
+        const tilt = n > 1 ? (i - (n - 1) / 2) * Math.min(4, 24 / n) : 0;
+        return '<div class="hand-card-wrap" style="--tilt:' + tilt.toFixed(1) + 'deg">' + slot(c, mine || s.reveal, null, null, null, 'hand') + '</div>';
+      }).join('') + '</div>';
     }
 
     function render() {
       const myTurn = duel.active === 0;
       const ph = duel.phase;
       const canAct = myTurn && duel.winner == null && !s.busy;
-      const emz = duel.emz.length ? '<div class="zones emz"><div class="zone-cells">' + duel.emz.map((c) => slot(c, c && c.controller === 0, 'Extra Monster')).join('') + '</div></div>' : '';
+      const emz = duel.emz.length ? '<div class="zones emz"><div class="zone-cells">' + duel.emz.map((c, i) => slot(c, !c || c.controller === 0, 'Extra Monster', 'emz', i, 'emz')).join('') + '</div></div>' : '';
       const logHtml = duel.log.slice(-80).map((l) => '<li class="' + (l.who === 0 ? 'me' : l.who === 1 ? 'opp' : '') + '">' + esc(l.text) + '</li>').join('');
       root.innerHTML =
         '<div class="duel">' +
@@ -282,6 +310,7 @@
             pinfo(1) + handRow(1) + zonesRow(1, 'st') + zonesRow(1, 'mz') + emz + zonesRow(0, 'mz') + zonesRow(0, 'st') + handRow(0) + pinfo(0) +
           '</div>' +
           '<aside class="duel-side">' +
+            '<div class="preview" id="card-preview">' + previewHtml(s.previewUid) + '</div>' +
             '<div class="turn-box"><div><strong>Turn ' + duel.turn + '</strong> · ' + (myTurn ? 'Your turn' : esc(duel.pname(1)) + '\'s turn') + '</div>' +
               '<div class="phases">' + ['main1', 'battle', 'main2', 'end'].map((x) => '<span class="' + (x === ph ? 'on' : '') + '">' + App.Duel.PHASE_LABEL[x].replace(' Phase', '').replace('Main ', 'M') + '</span>').join('') + '</div>' +
               (s.resolving ? '<div class="resolving">Resolving <strong>' + esc(s.resolving.name) + '</strong>: use the card menus for its effect, then <button type="button" class="btn btn-small btn-primary" id="resolve-done">Done</button></div>' : '') +
@@ -300,17 +329,231 @@
               '<button type="button" class="btn btn-small" data-tool="reveal">' + (s.reveal ? 'Hide' : 'Reveal') + ' opponent\'s hand</button>' +
               '<button type="button" class="btn btn-small btn-ghost" data-tool="new">New duel</button>' +
             '</div>' +
+            '<div class="sound-box"><button type="button" class="btn btn-small" data-tool="sound" aria-pressed="' + App.sound.isOn() + '">' + (App.sound.isOn() ? '🔊 Sound on' : '🔇 Sound off') + '</button>' +
+              '<input type="range" id="sound-vol" min="0" max="1" step="0.05" value="' + App.sound.volume() + '" aria-label="Volume"' + (App.sound.isOn() ? '' : ' disabled') + '></div>' +
+            '<p class="muted small tip">Tip: drag cards from your hand onto a zone to play them, drag a monster onto an opponent\'s monster (or their LP) to attack, or onto your GY to send it there.</p>' +
             '<ol class="duel-log" id="duel-log">' + logHtml + '</ol>' +
           '</aside>' +
         '</div>' +
         (duel.winner != null ? '<div class="winner-banner"><h2>' + (duel.winner === 0 ? '🏆 You win!' : '💀 ' + esc(duel.pname(1)) + ' wins') + '</h2><div class="row"><button type="button" class="btn btn-primary" id="rematch">Rematch</button><a class="btn" href="#/duel">New setup</a></div></div>' : '');
       const log = U.$('#duel-log', root);
       if (log) log.scrollTop = log.scrollHeight;
+      flushFx();
       maybeOpponentTurn();
     }
 
+    /* ---------- card preview ---------- */
+
+    function previewHtml(uid) {
+      const loc = uid && duel.find(uid);
+      if (!loc) return '<div class="preview-empty muted small">Hover over a card to see it here.</div>';
+      const c = loc.card;
+      const mine = loc.player === 0 || c.controller === 0;
+      const hidden = (!c.faceUp && !mine) || (loc.zone === 'hand' && !mine && !s.reveal) || loc.zone === 'deck';
+      if (hidden) return '<div class="preview-card"><span class="cardback big"></span></div><div class="preview-info"><strong>Face-down card</strong></div>';
+      const monster = duel.kind(c) === 'monster';
+      return '<div class="preview-card"><img src="' + esc(api.image(c.data, 'large')) + '" alt=""></div>' +
+        '<div class="preview-info"><strong>' + esc(c.name) + '</strong><div class="type-line small">' + esc(api.typeLine(c.data)) + '</div>' +
+        (monster ? '<div class="stat-line small">' + esc(api.statLine(Object.assign({}, c.data, { atk: duel.atk(c), def: duel.def(c) }))) + '</div>' : '') +
+        '<div class="preview-text">' + descHtml(c) + '</div></div>';
+    }
+
+    root.addEventListener('mouseover', (e) => {
+      const el = e.target.closest('[data-uid]');
+      if (!el || el.getAttribute('data-uid') === s.previewUid) return;
+      s.previewUid = el.getAttribute('data-uid');
+      const box = document.getElementById('card-preview');
+      if (box) box.innerHTML = previewHtml(s.previewUid);
+    });
+
     duel.listeners = [];
+    duel.fxListeners = [];
     duel.on(() => { if (!render.pending) { render.pending = true; requestAnimationFrame(() => { render.pending = false; render(); }); } });
+
+    /* ---------- sounds & animations ---------- */
+
+    s.fxQueue = [];
+    const el = (uid) => root.querySelector('[data-uid="' + uid + '"]');
+
+    function flushFx() {
+      const q = s.fxQueue.splice(0);
+      q.forEach((f) => {
+        const node = f.uid ? el(f.uid) : null;
+        if (f.cls && node) {
+          node.classList.add(f.cls);
+          node.addEventListener('animationend', () => node.classList.remove(f.cls), { once: true });
+        }
+        if (f.run) f.run(node);
+      });
+    }
+
+    function banner(text, kind) {
+      document.querySelectorAll('.duel-banner').forEach((x) => x.remove());
+      const b = document.createElement('div');
+      b.className = 'duel-banner ' + (kind || '');
+      b.textContent = text;
+      document.body.appendChild(b);
+      setTimeout(() => b.remove(), 1500);
+    }
+
+    function floatNumber(p, text, kind) {
+      const box = document.getElementById('lp-' + p);
+      if (!box) return;
+      const r = box.getBoundingClientRect();
+      const f = document.createElement('div');
+      f.className = 'float-num ' + kind;
+      f.textContent = text;
+      f.style.left = (r.left + r.width / 2) + 'px';
+      f.style.top = (r.top + window.scrollY) + 'px';
+      document.body.appendChild(f);
+      setTimeout(() => f.remove(), 1400);
+    }
+
+    /* A copy of a card that plays its "destroyed" animation where the card was. */
+    function ghost(uid, cls) {
+      const node = el(uid);
+      if (!node) return;
+      const r = node.getBoundingClientRect();
+      const g = node.cloneNode(true);
+      g.removeAttribute('data-uid');
+      g.className += ' ghost ' + cls;
+      Object.assign(g.style, { position: 'absolute', left: r.left + window.scrollX + 'px', top: r.top + window.scrollY + 'px', width: r.width + 'px', height: r.height + 'px', margin: 0 });
+      document.body.appendChild(g);
+      setTimeout(() => g.remove(), 900);
+    }
+
+    function lunge(attackerUid, targetUid, p) {
+      const a = el(attackerUid);
+      if (!a || !a.animate) return;
+      const ar = a.getBoundingClientRect();
+      let tr;
+      const t = targetUid ? el(targetUid) : document.getElementById('lp-' + (1 - p));
+      if (t) tr = t.getBoundingClientRect();
+      const dx = tr ? (tr.left + tr.width / 2) - (ar.left + ar.width / 2) : 0;
+      const dy = tr ? (tr.top + tr.height / 2) - (ar.top + ar.height / 2) : (p === 0 ? -120 : 120);
+      a.animate([
+        { transform: getComputedStyle(a).transform === 'none' ? 'none' : getComputedStyle(a).transform, zIndex: 5 },
+        { transform: 'translate(' + dx * 0.85 + 'px,' + dy * 0.85 + 'px) scale(1.15)', zIndex: 5, offset: 0.45 },
+        { transform: getComputedStyle(a).transform === 'none' ? 'none' : getComputedStyle(a).transform }
+      ], { duration: 520, easing: 'cubic-bezier(.5,0,.3,1)' });
+      if (t) setTimeout(() => { t.classList.add('fx-hit'); setTimeout(() => t.classList.remove('fx-hit'), 400); }, 230);
+    }
+
+    duel.onFx((type, d) => {
+      App.sound.play(type, d);
+      switch (type) {
+        case 'summon': s.fxQueue.push({ uid: d.uid, cls: d.tribute ? 'fx-special' : 'fx-summon' }); break;
+        case 'special': s.fxQueue.push({ uid: d.uid, cls: d.extra ? 'fx-special' : 'fx-summon' }); if (d.extra && d.how) banner(d.how + '!', 'summon'); break;
+        case 'set': s.fxQueue.push({ uid: d.uid, cls: 'fx-set' }); break;
+        case 'activate': s.fxQueue.push({ uid: d.uid, cls: 'fx-activate' }); break;
+        case 'draw': if (d.player === 0) s.fxQueue.push({ run: () => { const cards = root.querySelectorAll('.hand-row.mine .card-slot'); for (let i = Math.max(0, cards.length - d.count); i < cards.length; i++) cards[i].classList.add('fx-draw'); } }); break;
+        case 'destroy': ghost(d.uid, 'fx-destroy'); break;
+        case 'move': if (d.from === 'mz' || d.from === 'emz' || d.from === 'st' || d.from === 'field') ghost(d.uid, d.to === 'banished' ? 'fx-banish' : 'fx-fade'); break;
+        case 'attack': lunge(d.attacker, d.target, d.player); break;
+        case 'damage':
+          floatNumber(d.player, '-' + d.amount, 'dmg');
+          if (d.amount >= 2000) { const b = root.querySelector('.board'); if (b) { b.classList.remove('fx-shake'); void b.offsetWidth; b.classList.add('fx-shake'); } }
+          break;
+        case 'gain': floatNumber(d.player, '+' + d.amount, 'heal'); break;
+        case 'phase': if (d.phase === 'battle') banner('Battle Phase', 'battle'); break;
+        case 'turn': banner(d.player === 0 ? 'Your Turn' : d.name + '\'s Turn', d.player === 0 ? 'mine' : 'theirs'); break;
+        case 'win': banner('Victory!', 'win'); break;
+        case 'lose': banner('Defeat', 'lose'); break;
+        default: break;
+      }
+    });
+
+    /* ---------- drag and drop ---------- */
+
+    root.addEventListener('dragstart', (e) => {
+      const node = e.target.closest('[data-uid][draggable="true"]');
+      if (!node || duel.winner != null) return;
+      s.drag = node.getAttribute('data-uid');
+      e.dataTransfer.setData('text/plain', s.drag);
+      e.dataTransfer.effectAllowed = 'move';
+      const loc = duel.find(s.drag);
+      const kind = loc && duel.kind(loc.card);
+      root.classList.add('dragging', 'drag-from-' + (loc ? loc.zone : 'x'), 'drag-kind-' + kind);
+      if (loc && (loc.zone === 'mz' || loc.zone === 'emz') && duel.phase === 'battle' && duel.active === 0) root.classList.add('drag-attack');
+    });
+    root.addEventListener('dragend', () => {
+      s.drag = null;
+      root.className = root.className.split(' ').filter((c) => !/^drag/.test(c)).join(' ');
+    });
+    const dropTarget = (e) => e.target.closest('[data-drop], .card-slot.theirs.target, .card-slot.mine');
+    root.addEventListener('dragover', (e) => {
+      if (!s.drag) return;
+      const t = dropTarget(e);
+      if (t) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; t.classList.add('drop-hover'); }
+    });
+    root.addEventListener('dragleave', (e) => { const t = dropTarget(e); if (t) t.classList.remove('drop-hover'); });
+    root.addEventListener('drop', async (e) => {
+      const t = dropTarget(e);
+      const uid = s.drag || e.dataTransfer.getData('text/plain');
+      if (!t || !uid) return;
+      e.preventDefault();
+      t.classList.remove('drop-hover');
+      await handleDrop(uid, t);
+      render();
+    });
+
+    async function handleDrop(uid, t) {
+      const loc = duel.find(uid);
+      if (!loc) return;
+      const c = loc.card;
+      const k = duel.kind(c);
+      const drop = t.getAttribute('data-drop');
+      const index = Number(t.getAttribute('data-index'));
+      const bad = (msg) => { App.sound.play('invalid'); U.toast(msg); };
+      // Attacks: my monster onto an opponent's monster or their LP.
+      if ((loc.zone === 'mz' || loc.zone === 'emz') && (drop === 'opp-lp' || t.classList.contains('theirs'))) {
+        if (duel.phase !== 'battle' || duel.active !== 0) return bad('Attacks happen in your Battle Phase.');
+        return attackFlow(c, drop === 'opp-lp' ? null : t.getAttribute('data-uid'));
+      }
+      if (t.classList.contains('card-slot')) return; // dropped on another of my cards: nothing to do
+      if (drop === 'gy' || drop === 'banished' || drop === 'deck' || drop === 'hand') {
+        if (loc.zone === drop) return;
+        return duel.sendTo(uid, drop === 'deck' ? 'deck' : drop);
+      }
+      if (drop === 'mz' || drop === 'emz') {
+        if (k !== 'monster') return bad('Only monsters go in Monster Zones.');
+        const zone = drop === 'mz' ? { mz: index } : { emz: index };
+        if (loc.zone === 'hand' && !duel.isExtra(c)) {
+          const opts = [];
+          if (duel.active === 0 && duel.isMain() && !duel.players[0].normalSummoned) {
+            opts.push({ label: (duel.tributesNeeded(c) ? 'Tribute Summon' : 'Normal Summon'), value: 'atk', primary: true }, { label: 'Set face-down', value: 'set' });
+          }
+          opts.push({ label: 'Special Summon (by an effect)', value: 'special' }, { label: 'Cancel', value: null });
+          const how = await ask(c.name, '', opts);
+          if (!how) return;
+          if (how === 'special') return specialTo(c, zone);
+          return summonFlow(c, how, zone);
+        }
+        if (loc.zone === 'mz' || loc.zone === 'emz') return;
+        return specialTo(c, zone);
+      }
+      if (drop === 'st' || drop === 'field') {
+        if (loc.zone !== 'hand') return bad('Play Spells and Traps from your hand.');
+        if (k !== 'spell' && k !== 'trap') return bad('Only Spells and Traps go there.');
+        const isField = k === 'spell' && /Field/.test(c.data.race || '');
+        if ((drop === 'field') !== isField) return bad(isField ? 'Field Spells go in the Field Zone.' : 'That goes in a Spell & Trap Zone.');
+        const opts = [];
+        if (k === 'spell' || /activate this card from your hand/i.test(c.data.desc || '')) opts.push({ label: 'Activate', value: 'activate', primary: true });
+        if (duel.active === 0 && duel.isMain()) opts.push({ label: 'Set face-down', value: 'set', primary: !opts.length });
+        opts.push({ label: 'Cancel', value: null });
+        const how = await ask(c.name, '', opts);
+        if (how === 'activate') return activateFlow(uid, null, drop === 'st' ? index : null);
+        if (how === 'set') { const r = duel.setSpellTrap(0, uid, drop === 'st' ? index : null); if (!r.ok) bad(r.message); }
+      }
+    }
+
+    async function specialTo(c, zone) {
+      if (duel.isExtra(c) && duel.find(c.uid).zone === 'extra') return extraSummonFlow(c, { zone: zone });
+      const pos = await ask('Position', '', [{ label: 'Attack', value: 'atk', primary: true }, { label: 'Defense', value: 'def' }]);
+      if (!pos) return;
+      const r = duel.specialSummon(0, c.uid, pos, { how: 'effect', zone: zone });
+      if (!r.ok) U.toast(r.message);
+    }
 
     /* ---------- opponent's turn ---------- */
 
@@ -347,25 +590,24 @@
     /* ---------- your actions ---------- */
 
     async function resolveEffect(card, pf, isST, ctx) {
-      const autoOk = pf && (!pf.choose || pf.choose.pool.length) && (!pf.fusion || pf.fusion.length) && (pf.ops.length || pf.choose || pf.fusion || pf.negateAttack);
+      const isFusion = pf && pf.fusion;
+      const autoOk = pf && !isFusion && (!pf.choose || pf.choose.pool.length) && (pf.ops.length || pf.choose || pf.negateAttack);
       const buttons = [];
-      if (autoOk) buttons.push({ label: 'Auto-resolve: ' + pf.summary, value: 'auto', primary: true });
+      if (isFusion) buttons.push({ label: 'Fusion Summon: choose the monster and its materials', value: 'fusion', primary: true });
+      else if (autoOk) buttons.push({ label: 'Auto-resolve: ' + pf.summary, value: 'auto', primary: true });
       if (ctx && ctx.attack) buttons.push({ label: 'It negates the attack', value: 'negate' });
-      buttons.push({ label: autoOk ? 'Resolve manually' : 'Resolve it with the card menus', value: 'manual', primary: !autoOk });
-      const choice = await ask('Resolve ' + card.name, descHtml(card) + (pf && !autoOk ? '<p class="muted small">' + esc(pf.summary) + '.</p>' : ''), buttons);
-      if (choice === 'auto') {
+      buttons.push({ label: autoOk || isFusion ? 'Resolve manually' : 'Resolve it with the card menus', value: 'manual', primary: !autoOk && !isFusion });
+      const choice = await ask('Resolve ' + card.name, descHtml(card) + (pf && !autoOk && !isFusion ? '<p class="muted small">' + esc(pf.summary) + '.</p>' : ''), buttons);
+      if (choice === 'fusion') {
+        await fusionFlow(pf.fromDeck);
+        if (isST) duel.finishActivation(card.uid);
+      } else if (choice === 'auto') {
         let chosen = [];
         if (pf.choose) {
           const cards = pf.choose.pool.map((u) => duel.find(u)).filter(Boolean).map((x) => x.card);
           chosen = await choose(pf.choose.label, cards, { sub: (c) => { const l = duel.find(c.uid); return l.player === 0 ? 'yours · ' + l.zone : 'opponent · ' + l.zone; } }) || [];
         }
-        let fusionPick = null;
-        if (pf.fusion && pf.fusion.length > 1) {
-          const ch = await choose('Which Fusion Monster?', pf.fusion.map((f) => f.fusion), { sub: (c) => 'uses ' + pf.fusion.find((f) => f.fusion.uid === c.uid).materials.map((m) => m.name).join(' + ') });
-          fusionPick = ch ? pf.fusion.find((f) => f.fusion.uid === ch[0]) : null;
-          if (!fusionPick) { if (isST) duel.finishActivation(card.uid); return; }
-        }
-        App.Effects.run(duel, 0, pf, chosen, fusionPick);
+        App.Effects.run(duel, 0, pf, chosen);
         if (pf.discard) {
           const disc = await choose('Discard ' + pf.discard, duel.players[0].hand.slice(), { count: pf.discard, min: Math.min(pf.discard, duel.players[0].hand.length), confirm: 'Discard' });
           (disc || duel.players[0].hand.slice(0, pf.discard).map((c) => c.uid)).forEach((u) => duel.sendTo(u, 'gy', 'discarded'));
@@ -380,25 +622,24 @@
       }
     }
 
-    async function activateFlow(uid, ctx) {
-      const r = duel.activateSpellTrap(0, uid);
-      if (!r.ok) { U.toast(r.message); return; }
+    async function activateFlow(uid, ctx, zoneIndex) {
+      const r = duel.activateSpellTrap(0, uid, zoneIndex);
+      if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); return; }
       const pf = App.Effects.plan(duel, 0, r.card, ctx);
       await resolveEffect(r.card, pf, true, ctx);
-      // The bot or Claude may respond to big plays later; keep it simple for now.
     }
 
-    async function summonFlow(c, pos) {
+    async function summonFlow(c, pos, zone) {
       const need = duel.tributesNeeded(c);
       let tributes = [];
       if (need) {
         const mons = duel.monsters(0).map((m) => m.card);
-        if (mons.length < need) { U.toast(c.name + ' needs ' + need + ' Tribute' + (need > 1 ? 's' : '') + '.'); return; }
+        if (mons.length < need) { App.sound.play('invalid'); U.toast(c.name + ' needs ' + need + ' Tribute' + (need > 1 ? 's' : '') + '.'); return; }
         tributes = await choose('Choose ' + need + ' monster' + (need > 1 ? 's' : '') + ' to Tribute', mons, { count: need, min: need, confirm: 'Tribute' });
         if (!tributes) return;
       }
-      const r = duel.normalSummon(0, c.uid, pos, tributes);
-      if (!r.ok) { U.toast(r.message); return; }
+      const r = duel.normalSummon(0, c.uid, pos, tributes, zone);
+      if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); return; }
       if (pos !== 'set' && /if this card is normal (or special )?summoned/i.test(c.data.desc || '')) {
         const pf = App.Effects.plan(duel, 0, c, { summoned: true });
         if (pf) {
@@ -408,31 +649,71 @@
       }
     }
 
-    async function extraSummonFlow(c) {
-      const req = String(c.data.desc || '').split('\n')[0];
-      const pool = duel.monsters(0).map((m) => m.card).concat(/fusion/i.test(c.data.type) ? duel.players[0].hand.filter((x) => duel.kind(x) === 'monster') : []);
-      const mats = await choose('Materials for ' + c.name, pool, { count: 10, min: 0, confirm: 'Summon', note: 'Requirement: ' + req + ' — pick the materials (they go to the GY; Xyz materials are attached).', sub: (x) => duel.find(x.uid).zone === 'hand' ? 'hand' : duel.atk(x) + ' ATK' });
-      if (mats === null) return;
-      const pos = /link/i.test(c.data.type) ? 'atk' : await ask('Position', '', [{ label: 'Attack Position', value: 'atk', primary: true }, { label: 'Defense Position', value: 'def' }]);
-      if (!pos) return;
-      const r = duel.specialSummon(0, c.uid, pos, { materials: mats, how: /link/i.test(c.data.type) ? 'Link Summon' : /xyz/i.test(c.data.type) ? 'Xyz Summon' : /synchro/i.test(c.data.type) ? 'Synchro Summon' : /fusion/i.test(c.data.type) ? 'Fusion Summon' : 'from the Extra Deck' });
-      if (!r.ok) U.toast(r.message);
+    function matSub(x) {
+      const z = duel.find(x.uid).zone;
+      const where = z === 'mz' || z === 'emz' ? 'field' : z;
+      const t = x.data.type || '';
+      const lv = /link/i.test(t) ? 'Link-' + (x.data.linkval || '?') : (/xyz/i.test(t) ? 'Rank ' : 'Lv ') + (x.data.level || '?');
+      return where + ' · ' + lv + (/tuner/i.test(t) ? ' · Tuner' : '');
     }
 
-    async function attackFlow(c) {
+    /* Fusion spell: you pick which Fusion Monster, then its materials. */
+    async function fusionFlow(fromDeck) {
+      const extras = duel.players[0].extra.filter((x) => /fusion/i.test(x.data.type || ''));
+      if (!extras.length) { App.sound.play('invalid'); U.toast('You have no Fusion Monsters in your Extra Deck.'); return; }
+      const sources = duel.players[0].hand.filter((x) => duel.kind(x) === 'monster')
+        .concat(duel.monsters(0).map((m) => m.card))
+        .concat(fromDeck ? duel.players[0].deck.filter((x) => duel.kind(x) === 'monster') : []);
+      const makeable = new Set(App.Effects.fusionOptions(duel, 0, sources).map((o) => o.fusion.uid));
+      const pick = await choose('Which Fusion Monster?', extras, { sub: (x) => (makeable.has(x.uid) ? '✓ ' : '') + App.Materials.requirement(x) });
+      if (!pick) return;
+      await extraSummonFlow(duel.find(pick[0]).card, { pool: sources });
+    }
+
+    /* Fusion / Synchro / Xyz / Link: you choose the materials; the rules check them. */
+    async function extraSummonFlow(c, opts) {
+      const o = opts || {};
+      const kind = App.Materials.summonKind(c);
+      const req = App.Materials.requirement(c);
+      const isFusion = /fusion/i.test(c.data.type || '');
+      const pool = o.pool || duel.monsters(0).map((m) => m.card).concat(isFusion ? duel.players[0].hand.filter((x) => duel.kind(x) === 'monster') : []);
+      if (!pool.length) { App.sound.play('invalid'); U.toast('You have no monsters to use as materials.'); return; }
+      let mats;
+      for (;;) {
+        mats = await choose(kind + ': ' + c.name, pool, { count: 12, min: 1, confirm: kind, note: 'Requirement: ' + req + '. Pick the materials you want to use.', sub: matSub });
+        if (!mats) return;
+        const chk = App.Materials.check(c, mats.map((u) => duel.find(u).card));
+        if (chk.ok && !chk.unchecked) break;
+        App.sound.play(chk.ok ? 'click' : 'invalid');
+        const choice = await ask(chk.ok ? 'Check your materials' : 'Those materials don\'t fit',
+          '<p>' + esc(chk.message || 'This requirement can\'t be checked automatically.') + '</p><p class="muted small">Requirement: ' + esc(req) + '</p>',
+          chk.ok
+            ? [{ label: kind + ' with these', value: 'go', primary: true }, { label: 'Choose again', value: 'again' }]
+            : [{ label: 'Choose again', value: 'again', primary: true }, { label: 'Summon anyway (a card effect allows it)', value: 'go' }, { label: 'Cancel', value: null }]);
+        if (choice === 'go') break;
+        if (choice !== 'again') return;
+      }
+      const pos = /link/i.test(c.data.type || '') ? 'atk' : await ask('Position', '', [{ label: 'Attack Position', value: 'atk', primary: true }, { label: 'Defense Position', value: 'def' }]);
+      if (!pos) return;
+      const r = duel.specialSummon(0, c.uid, pos, { materials: mats, how: kind, zone: o.zone });
+      if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); }
+    }
+
+    async function attackFlow(c, presetTarget) {
       const chk = duel.canAttack(0, c.uid);
-      if (!chk.ok) { U.toast(chk.message); return; }
+      if (!chk.ok) { App.sound.play('invalid'); U.toast(chk.message); return; }
       const targets = duel.monsters(1).map((m) => m.card);
-      let target = null;
-      if (targets.length) {
+      let target = presetTarget === undefined ? null : presetTarget;
+      if (presetTarget === undefined && targets.length) {
         const pick = await choose('Attack which monster?', targets, { sub: (t) => t.faceUp ? (t.pos === 'atk' ? duel.atk(t) + ' ATK' : duel.def(t) + ' DEF') : 'face-down' });
         if (!pick) return;
         target = pick[0];
       }
       const r = duel.declareAttack(0, c.uid, target);
-      if (!r.ok) { U.toast(r.message); return; }
+      if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); return; }
       s.busy = true;
       try {
+        await ui.pause(450);
         if (s.oppType === 'claude') await App.ClaudeOpponent.respondToAttack(duel, 1, ui);
         else App.Bot.respondToAttack(duel, 1);
       } finally { s.busy = false; }
@@ -555,6 +836,7 @@
       duel.endTurn();
     }
 
+    root.addEventListener('input', (e) => { if (e.target.id === 'sound-vol') App.sound.setVolume(e.target.value); });
     root.addEventListener('click', async (e) => {
       const t = e.target;
       if (t.closest('#resolve-done')) {
@@ -575,6 +857,7 @@
         if (what === 'search') await openPile(0, 'deck');
         if (what === 'lp') await changeLp();
         if (what === 'reveal') s.reveal = !s.reveal;
+        if (what === 'sound') App.sound.toggle();
         if (what === 'new') { location.hash = '#/duel'; return; }
         duel.changed();
         return;

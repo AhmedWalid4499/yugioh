@@ -266,6 +266,43 @@ function apiResponse(url) {
     check(await page.evaluate(() => App.duelSession().duel.monsters(0).length === 1), 'Normal Summon through the card menu');
   }
   await shot('09-duel-board');
+  // Drag a monster from the hand onto a chosen Monster Zone.
+  await page.evaluate(() => { const d = App.duelSession().duel; d.players[0].normalSummoned = false; });
+  const dragUid = await page.evaluate(() => { const d = App.duelSession().duel; const c = d.players[0].hand.find((x) => d.kind(x) === 'monster' && !d.isExtra(x) && d.tributesNeeded(x) === 0); return c ? c.uid : null; });
+  if (dragUid) {
+    await page.dragAndDrop('[data-uid="' + dragUid + '"]', '.zones.mz [data-drop="mz"][data-index="4"]');
+    await page.click('[data-b]:has-text("Normal Summon")');
+    if (await page.locator('[data-b]:has-text("Not now"):visible').count()) await page.click('[data-b]:has-text("Not now")');
+    check(await page.evaluate((u) => { const d = App.duelSession().duel; return d.players[0].mz[4] && d.players[0].mz[4].uid === u; }, dragUid), 'drag a card from the hand onto Monster Zone 5 to summon it there');
+  }
+  // Extra Deck summon: you choose the materials and the rules check them.
+  await page.evaluate(() => {
+    const d = App.duelSession().duel;
+    const cat = d.players[0].extra.find((x) => /Cat Dancer/.test(x.name));
+    const luna = d.players[0].deck.filter((x) => /^Lunalight/.test(x.name) && d.kind(x) === 'monster').slice(0, 2);
+    luna.forEach((x) => { d.players[0].deck.splice(d.players[0].deck.indexOf(x), 1); d.players[0].hand.push(x); });
+    window.__catUid = cat && cat.uid; window.__luna = luna.map((x) => x.uid);
+    d.changed();
+  });
+  const catUid = await page.evaluate(() => window.__catUid);
+  if (catUid) {
+    await page.click('[data-pile="extra"][data-p="0"]');
+    await page.click('.pick-card[data-pick="' + catUid + '"]');
+    await page.click('.menu-actions button:has-text("Summon from the Extra Deck")');
+    check(await page.locator('.pick-grid .pick-card.selected').count() === 0, 'materials are not pre-picked for you');
+    const others = await page.evaluate(() => { const d = App.duelSession().duel; return d.players[0].hand.filter((x) => d.kind(x) === 'monster').concat(d.monsters(0).map((m) => m.card)).filter((x) => !/^Lunalight/.test(x.name)).map((x) => x.uid).slice(0, 2); });
+    if (others.length) {
+      await page.click('.pick-card[data-pick="' + others[0] + '"]');
+      await page.click('[data-ok]');
+      check(/don't fit/.test(await page.textContent('#modal-body')), 'wrong materials are caught with an explanation');
+      await page.click('[data-b]:has-text("Choose again")');
+    }
+    const luna = await page.evaluate(() => window.__luna);
+    for (const u of luna) await page.click('.pick-card[data-pick="' + u + '"]');
+    await page.click('[data-ok]');
+    if (await page.locator('[data-b]:has-text("Attack Position"):visible').count()) await page.click('[data-b]:has-text("Attack Position")');
+    check(await page.evaluate(() => App.duelSession().duel.monsters(0).some((m) => /Cat Dancer/.test(m.card.name))), 'Fusion Summon with the materials you chose');
+  }
   await page.click('#end-turn');
   // Let the bot play; answer any "respond to the attack?" prompt with No response.
   for (let i = 0; i < 100; i++) {

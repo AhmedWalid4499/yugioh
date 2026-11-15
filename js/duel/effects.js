@@ -106,8 +106,7 @@
         .concat(duel.monsters(p).map((x) => x.card))
         .concat(fromDeck ? duel.players[p].deck.filter((x) => duel.kind(x) === 'monster') : []);
       const options = fusionOptions(duel, p, sources);
-      if (!options.length) return { summary: 'No Fusion Monster can be made with your cards right now', ops: [] };
-      return { summary: 'Fusion Summon ' + options[0].fusion.name, ops: [], fusion: options };
+      return { summary: options.length ? 'Fusion Summon ' + options[0].fusion.name : 'Fusion Summon', ops: [], fusion: options, fromDeck: fromDeck };
     }
 
     // Draw

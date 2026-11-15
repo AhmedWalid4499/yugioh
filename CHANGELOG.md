@@ -2,6 +2,18 @@
 
 Each `## <version>` section becomes the "What's new" text shown in the app's update dialog and on the GitHub Release page.
 
+## 1.4.0
+- **You choose your materials:** Fusion, Synchro, Xyz and Link Summons let you pick the Fusion Monster and every material yourself. The rules then check your pick: Tuner and Level totals, Xyz Levels and counts, Link Ratings, and named Fusion materials. A card effect that bends the rules can still override the check.
+- **Interactive board:**
+  - Drag cards from your hand onto a zone to summon, set or activate them.
+  - Drag a monster onto an opponent's monster or their LP to attack.
+  - Drag a card onto your GY, Banished pile or Deck.
+  - Hover any card for a large preview.
+  - Playable cards glow, and monsters that can attack glow orange.
+- **New look:** a glowing duel playmat, LP bars, a fanned hand, and animations for summons, attacks, explosions, damage numbers and turn/phase banners.
+- **Sound effects:** draws, summons, Special Summons, sets, activations, attacks, explosions, damage, phases, victory and defeat. A sound on/off button and volume slider are on the duel screen.
+- **Fixed:** some duel windows could close by themselves when you clicked a card.
+
 ## 1.3.0
 - **Fixed:** Auto-Build and Duel bounced back to Card Search after updating the Mac app. The app had kept old copies of some files; updates now always load fresh files.
 - **Famous duelists:** pick Yugi, Kaiba, Joey, Jaden, Yusei, Jack, Crow, Yuma, Kite, Yuya, Playmaker and more as your opponent. Each plays a modern version of their deck, built from the newest support cards with their ace and signature cards.

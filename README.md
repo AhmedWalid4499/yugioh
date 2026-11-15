@@ -63,6 +63,18 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 - **What's automated:** turn and phase order, drawing, Normal and Tribute Summons, Sets, when Spells and Traps can be activated, position changes, battle, damage, LP and win conditions.
 - Common effects resolve with **one click**: draw, destroy, search, revive, burn, Fusion Summons, and Mirror Force-style Traps. Anything else you resolve with the card menus: move cards between zones, Special Summon, change ATK or LP, search the Deck.
 
+### 🎮 Duel board
+- **Drag and drop:**
+  - Drag a card from your hand onto a Monster Zone to summon or set it.
+  - Drag a Spell or Trap onto a Spell & Trap Zone to activate or set it.
+  - Drag a monster onto an opponent's monster, or their LP, to attack.
+  - Drag a card onto your GY, Banished pile or Deck to send it there.
+
+  Clicking a card still opens its full menu, which also works on phones.
+- **Hover preview** of any card, **glow hints** for what you can play and which monsters can attack, LP bars, and animations for summons, attacks, explosions and damage.
+- **Materials are always your choice:** for Fusion, Synchro, Xyz and Link Summons you pick the materials and the app checks them against the card's requirement.
+- **Sound effects** with an on/off button and volume slider.
+
 ### 🌟 Famous duelists
 Pick an opponent from the anime, each with a **modern version of their deck**. It's built live from the newest support cards in the database and always includes their ace and signature cards:
 
@@ -134,6 +146,13 @@ xattr -dr com.apple.quarantine "/Applications/Duel Vault.app"
 - Card images are loaded from YGOPRODeck's image server. If a picture can't be downloaded during Excel export, that cell uses an `IMAGE()` formula instead, which shows the picture in Excel 365 and Google Sheets.
 - This is a fan-made tool and isn't affiliated with Konami. Yu-Gi-Oh! is a trademark of Konami.
 
+## Credits
+- Card data and images: [YGOPRODeck API](https://ygoprodeck.com/api-guide/).
+- Sound effects: [uisfx](https://github.com/romainsimon/uisfx) via [`@wubbleai/community-sfx`](https://www.npmjs.com/package/@wubbleai/community-sfx), CC0 1.0 (`vendor/sfx`).
+- Synthesised game sounds: [ZzFX](https://github.com/KilledByAPixel/ZzFX) by Frank Force, MIT (`vendor/zzfx`).
+- Fonts: [Cinzel](https://fonts.google.com/specimen/Cinzel) and [Rajdhani](https://fonts.google.com/specimen/Rajdhani) via Fontsource, SIL Open Font License (`vendor/fonts`).
+- Excel support: [ExcelJS](https://github.com/exceljs/exceljs), MIT.
+
 ## For developers
 Plain HTML, CSS and JavaScript, with no build step. The files:
 
@@ -151,7 +170,9 @@ Plain HTML, CSS and JavaScript, with no build step. The files:
 | `js/deckgen.js` | Auto-Build: archetype(s) and signature cards to deck |
 | `js/characters.js` | Famous duelists: archetypes, signature cards and personas |
 | `js/view-tools.js` | Auto-Build and Draw Tester pages |
-| `js/duel/engine.js` | Duel rules engine (zones, summons, phases, battle, LP) |
+| `js/duel/engine.js` | Duel rules engine (zones, summons, phases, battle, LP) and fx events |
+| `js/duel/materials.js` | Checks Fusion/Synchro/Xyz/Link materials against card requirements |
+| `js/sound.js` | Sound effects (CC0 samples + ZzFX) |
 | `js/duel/effects.js` | Effect reader: common effect wording to one-click resolution |
 | `js/duel/bot.js` | Built-in bot opponent |
 | `js/duel/claude.js` | Claude AI opponent (Messages API with a `take_actions` tool) |
