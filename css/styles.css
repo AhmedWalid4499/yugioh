@@ -653,3 +653,30 @@ label.check input { margin-top: 3px; }
 @media (prefers-reduced-motion: reduce) {
   .fx-summon, .fx-special, .fx-set, .fx-activate, .fx-draw, .fx-hit, .fx-shake, .card-slot.playable, .card-slot.ready { animation: none !important; }
 }
+
+/* ---------- Portraits ---------- */
+
+.avatar {
+  flex: none; width: 46px; height: 46px; border-radius: 50%; display: inline-grid; place-items: center;
+  background: radial-gradient(circle, #1b2340, #0b1020) center / cover no-repeat; color: #fff; font-size: 1.3rem;
+  border: 3px solid var(--ring, var(--accent)); box-shadow: 0 0 0 2px rgba(0, 0, 0, .5), 0 0 14px color-mix(in srgb, var(--ring, var(--accent)) 60%, transparent);
+}
+.avatar.big { width: 72px; height: 72px; font-size: 1.8rem; }
+.avatar[data-ace] { background-size: 160%; background-position: 50% 30%; }
+.duel-page .pinfo .avatar { width: 50px; height: 50px; }
+.you-pic .row { gap: 14px; align-items: center; margin: 0; }
+.you-pic p { margin: 2px 0 6px; }
+.char-tile-wrap { position: relative; }
+.char-tile-wrap .char-tile { width: 100%; height: 100%; }
+.char-tile .char-art { border: 2px solid var(--ring, transparent); }
+.char-photo, .char-photo-clear {
+  position: absolute; top: 10px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: rgba(10, 16, 34, .8); border: 1px solid rgba(255, 255, 255, .3); color: #fff; font-size: .8rem; opacity: 0; transition: opacity .15s;
+}
+.char-photo { right: 10px; }
+.char-photo-clear { right: 42px; padding: 0; }
+.char-tile-wrap:hover .char-photo, .char-tile-wrap:hover .char-photo-clear, .char-photo:focus-within { opacity: 1; }
+@media (hover: none) { .char-photo, .char-photo-clear { opacity: .85; } }
+.duel-settings { display: flex; flex-wrap: wrap; gap: 8px; }
+.duel-settings label { display: flex; flex-direction: column; gap: 4px; flex: 1 1 130px; font-size: .78rem; color: var(--muted); }
+.duel-settings select { font-size: .85rem; padding: 6px 8px; }

@@ -55,7 +55,12 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 
 ### ⚔ Duel
 - Practice duels with any saved deck. Your opponent can use one of your decks, an auto-built deck from any archetype, or a mirror match.
-- **Built-in bot (free, offline):** summons its strongest monster (tributing when worth it), uses common Spells, Fusion Summons when it can, attacks only when it wins the fight, and keeps Traps set for your attacks.
+- **Built-in bot (free, offline):** plays a full turn the way a player would:
+  - uses Spells and searches
+  - Special Summons extenders
+  - makes Synchro, Xyz, Link and Fusion Summons from its field
+  - attacks with sensible ordering and never makes a losing attack
+  - chains hand traps, counter traps and summon/attack traps against your plays
 - **Claude AI opponent:** reads every card's text and plays its deck like a person, including effects the bot doesn't understand.
   - Needs your own Anthropic API key, from console.anthropic.com. The key is saved only on your device and sent only to Anthropic.
   - Choose Opus 5.5 (strongest, roughly $1–2 per duel), Sonnet 5.5 (roughly 50¢–$1) or Haiku 5.5 (roughly 5¢). These are rough estimates.
@@ -74,6 +79,11 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 - **Hover preview** of any card, **glow hints** for what you can play and which monsters can attack, LP bars, and animations for summons, attacks, explosions and damage.
 - **Materials are always your choice:** for Fusion, Synchro, Xyz and Link Summons you pick the materials and the app checks them against the card's requirement.
 - **Sound effects** with an on/off button and volume slider.
+- **Chains and responses (official rules):**
+  - When your opponent activates a card or summons, you're asked whether to respond with a Set Trap or Quick-Play, a hand trap, or a Quick Effect. Choose *When I can*, *Always* or *Never*.
+  - Your opponent responds to your plays too, for example with Ash Blossom against a search or Bottomless Trap Hole against a big summon.
+- **Also in duels:** FLIP effects, once-per-turn warnings, monster effects from the GY, Surrender, and a duel speed setting.
+- **Portraits** next to each duelist's name: their ace card by default, or any picture you choose with 📷 (saved on your device only). Official character artwork isn't included because it's copyrighted.
 
 ### 🌟 Famous duelists
 Pick an opponent from the anime, each with a **modern version of their deck**. It's built live from the newest support cards in the database and always includes their ace and signature cards:

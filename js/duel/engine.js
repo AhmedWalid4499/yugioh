@@ -51,6 +51,8 @@
     this.log = [];
     this.listeners = [];
     this.pendingAttack = null;
+    this.used = {};          // once-per-turn effects used this turn: "player:card name"
+    this.pendingFlips = [];  // monsters flipped face-up whose FLIP effects still need resolving
     this.emz = new Array(fmt.extraMonsterZones).fill(null);
     this.players = [0, 1].map((p) => {
       const deckSpec = opts.decks[p];
@@ -227,6 +229,7 @@
     const p = this.active;
     const pl = this.players[p];
     pl.normalSummoned = false;
+    this.used = {};
     this.monsters(p).forEach((m) => { m.card.attacked = false; m.card.posChanged = false; });
     this.phase = 'draw';
     this.say('— Turn ' + this.turn + ': ' + pl.name + ' —');
@@ -279,6 +282,15 @@
     if (!silent) { this.say(pl.name + ' ' + this.v(p, 'draws', 'draw') + ' ' + (drawn === 1 ? 'a card' : drawn + ' cards') + '.', p); this.fx('draw', { player: p, count: drawn }); }
     return drawn;
   };
+
+  /* Once-per-turn tracking ("You can only use this effect of X once per turn"). */
+  P.isOncePerTurn = function (c) { return /once per turn/i.test(c.data.desc || '') && /you can only (use|activate)/i.test(c.data.desc || ''); };
+  P.usedThisTurn = function (p, c) { return !!this.used[p + ':' + c.name]; };
+  P.markUsed = function (p, c) { if (this.isOncePerTurn(c)) this.used[p + ':' + c.name] = true; };
+
+  P.queueFlip = function (c) { if (/FLIP:/i.test(c.data.desc || '')) this.pendingFlips.push(c.uid); };
+
+  P.surrender = function (p) { this.lose(p, this.pname(p) + ' surrendered'); };
 
   P.lose = function (p, why) {
     if (this.winner != null) return;
@@ -442,7 +454,7 @@
     const c = m.card;
     if (c.summonTurn === this.turn) return fail('A monster cannot change position the turn it was summoned.');
     if (c.posChanged || c.attacked) return fail('This monster already changed position or attacked this turn.');
-    if (!c.faceUp) { c.faceUp = true; c.pos = 'atk'; this.say(this.pname(p) + ' ' + this.v(p, 'Flip Summons', 'Flip Summon') + ' ' + c.name + '.', p); }
+    if (!c.faceUp) { c.faceUp = true; c.pos = 'atk'; this.say(this.pname(p) + ' ' + this.v(p, 'Flip Summons', 'Flip Summon') + ' ' + c.name + '.', p); this.fx('summon', { uid: c.uid, player: p }); this.queueFlip(c); }
     else { c.pos = c.pos === 'atk' ? 'def' : 'atk'; this.say(c.name + ' changes to ' + (c.pos === 'atk' ? 'Attack' : 'Defense') + ' Position.', p); }
     c.posChanged = true;
     this.changed();
@@ -503,7 +515,7 @@
     const tLoc = this.find(pa.target);
     if (!tLoc || ['mz', 'emz'].indexOf(tLoc.zone) === -1) { this.say('The attack target is gone, so the attack ends.'); this.changed(); return; }
     const t = tLoc.card;
-    if (!t.faceUp) { t.faceUp = true; this.say(t.name + ' is flipped face-up (' + this.atk(t) + '/' + this.def(t) + ').'); }
+    if (!t.faceUp) { t.faceUp = true; this.say(t.name + ' is flipped face-up (' + this.atk(t) + '/' + this.def(t) + ').'); this.queueFlip(t); }
     const av = this.atk(a);
     const pierce = /piercing|inflict piercing/i.test(a.data.desc || '');
     if (t.pos === 'atk') {

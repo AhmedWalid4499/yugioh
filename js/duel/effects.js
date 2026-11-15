@@ -99,6 +99,55 @@
       }
     }
 
+    // Responses to an activation (chain): hand traps and counter traps.
+    if (context.activation) {
+      const ev = context.activation;
+      const evText = String((ev.card && ev.card.data && ev.card.data.desc) || '').toLowerCase();
+      const evOps = (ev.plan && ev.plan.choose && ev.plan.choose.fromDeck ? ['search'] : []).concat(ev.plan && ev.plan.fusion && ev.plan.fromDeck ? ['deck-summon'] : []);
+      const fromDeck = evOps.length || /(add|special summon|send)[^.]{0,80}from (your|the) deck/.test(evText);
+      // Ash Blossom-style: negate effects that search, summon from or send from the Deck.
+      if (/includes any of these effects/.test(t) && /negate that effect/.test(t)) {
+        return fromDeck ? { summary: 'Negate that effect', ops: [], negateActivation: true } : null;
+      }
+      // Counter traps / "negate the activation".
+      if (/negate the activation/.test(t) && (kind === 'trap' || /quick effect/.test(t))) {
+        const destroy = /and if you do, destroy (it|that card)|negate the activation, and if you do, destroy/.test(t);
+        if (/spell card|trap card|spell\/trap/.test(t) && ev.kind === 'monster' && !/monster effect|card or effect/.test(t)) return null;
+        if (/monster effect/.test(t) && !/spell|trap/.test(t) && ev.kind !== 'monster') return null;
+        return { summary: 'Negate the activation' + (destroy ? ' and destroy it' : ''), ops: destroy ? [{ op: 'destroy', card: ev.card.uid, reason: c.name }] : [], negateActivation: true };
+      }
+      // Effect Veiler / Infinite Impermanence: negate a face-up monster's effects.
+      if (/negate (its|that monster's|the) effects/.test(t) && ev.kind === 'monster' && ev.onField) {
+        return { summary: 'Negate ' + ev.card.name + '\'s effects', ops: [], negateActivation: true };
+      }
+      return null;
+    }
+
+    // Responses to a summon (Bottomless Trap Hole, Torrential Tribute…).
+    if (context.summon && (/when (your opponent|a player)[^.:;]{0,30} summons?/.test(t) || /when (a|your opponent's) monsters? (is|are|would be) (normal |special |flip )?summoned/.test(t))) {
+      const target = duel.find(context.summon);
+      if (/destroy all monsters on the field/.test(t)) {
+        const all = duel.monsters(0).concat(duel.monsters(1));
+        return { summary: 'Destroy all monsters on the field', ops: all.map((x) => ({ op: 'destroy', card: x.card.uid, reason: c.name })) };
+      }
+      if (target && /(destroy|banish)[^.]{0,60}(that|those|the summoned) monsters?|destroy (it|that target)|banish (it|that target)/.test(t)) {
+        if (/1000 or more atk|1500 or more atk/.test(t)) {
+          const need = /1500/.test(t) ? 1500 : 1000;
+          if (duel.atk(target.card) < need) return null;
+        }
+        const op = /banish/.test(t) ? 'banish' : 'destroy';
+        return { summary: (op === 'banish' ? 'Banish ' : 'Destroy ') + target.card.name, ops: [{ op: op, card: target.card.uid, reason: c.name }] };
+      }
+      if (target && /negate the summon/.test(t)) {
+        return { summary: 'Negate the summon of ' + target.card.name + ' and destroy it', ops: [{ op: 'destroy', card: target.card.uid, reason: c.name }] };
+      }
+    }
+
+    if (context.summon) return null;
+
+    // FLIP: effects are read like any other effect once the monster is flipped.
+    if (context.flip && !/flip:/.test(t)) return null;
+
     // Fusion Summon spells (Polymerization and archetype fusion spells)
     if (kind === 'spell' && /fusion summon/.test(t) && /extra deck/.test(t)) {
       const fromDeck = /from your deck/.test(t);

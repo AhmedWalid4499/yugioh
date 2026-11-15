@@ -2,6 +2,24 @@
 
 Each `## <version>` section becomes the "What's new" text shown in the app's update dialog and on the GitHub Release page.
 
+## 1.5.0
+- **Much smarter bot:**
+  - Synchro, Xyz and Link Summons from its own field (checked by the same rules as yours), plus Fusion Summons with spells.
+  - Special Summons extenders from its hand when their condition is met (e.g. Cyber Dragon).
+  - Uses its monsters' "when summoned" searches and plays Spells it understands.
+  - Chains hand traps against you: Ash Blossom against searches, Infinite Impermanence and Effect Veiler against monster effects, counter traps against Spells and Traps.
+  - Springs Trap Hole-style traps on your summons and Mirror Force-style traps on your attacks.
+  - In battle it clears blockers with its weakest winning attacker, never makes losing attacks, Flip Summons when useful, and switches outclassed monsters to Defense.
+  - Respects once-per-turn effects.
+- **Chains and response windows (official rules):**
+  - When your opponent activates a card or summons, you can respond with a Set Trap or Quick-Play, a hand trap, or a Quick Effect.
+  - Choose when you're asked: *When I can* (default), *Always* or *Never*.
+  - Your opponent can respond to your plays the same way.
+- **FLIP effects** activate when a monster is flipped face-up, by an attack or a Flip Summon.
+- **Once-per-turn warnings** when you try to use an effect twice in a turn.
+- **Monster effects from the GY**, a **Surrender** button and a **duel speed** setting.
+- **Portraits:** every duelist is shown with a portrait next to their name: their ace card in their colour, or a picture you choose (📷).
+
 ## 1.4.0
 - **You choose your materials:** Fusion, Synchro, Xyz and Link Summons let you pick the Fusion Monster and every material yourself. The rules then check your pick: Tuner and Level totals, Xyz Levels and counts, Link Ratings, and named Fusion materials. A card effect that bends the rules can still override the check.
 - **Interactive board:**
