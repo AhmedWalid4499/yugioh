@@ -270,7 +270,6 @@ function apiResponse(url) {
   await page.evaluate(() => { const d = App.duelSession().duel; d.players[0].normalSummoned = false; });
   const dragUid = await page.evaluate(() => { const d = App.duelSession().duel; const c = d.players[0].hand.find((x) => d.kind(x) === 'monster' && !d.isExtra(x) && d.tributesNeeded(x) === 0); return c ? c.uid : null; });
   if (dragUid) {
-    await page.locator('.hand-row.mine').scrollIntoViewIfNeeded();
     await page.dragAndDrop('[data-uid="' + dragUid + '"]', '.zones.mz [data-drop="mz"][data-index="4"]');
     await page.click('[data-b]:has-text("Normal Summon")');
     if (await page.locator('[data-b]:has-text("Not now"):visible').count()) await page.click('[data-b]:has-text("Not now")');
