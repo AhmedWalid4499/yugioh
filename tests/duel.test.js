@@ -11,7 +11,7 @@ const ROOT = path.resolve(__dirname, '..');
 global.window = global;
 global.localStorage = { _d: {}, getItem(k) { return this._d[k] == null ? null : this._d[k]; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
 global.document = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
-['js/util.js', 'js/formats.js', 'js/api.js', 'js/insights.js', 'js/decks.js', 'js/deckgen.js', 'js/characters.js', 'js/duel/engine.js', 'js/duel/materials.js', 'js/duel/effects.js', 'js/duel/bot.js', 'js/duel/claude.js']
+['js/util.js', 'js/formats.js', 'js/api.js', 'js/insights.js', 'js/decks.js', 'js/deckgen.js', 'js/characters.js', 'js/game.js', 'js/duel/engine.js', 'js/duel/materials.js', 'js/duel/effects.js', 'js/duel/bot.js', 'js/duel/claude.js']
   .forEach((f) => vm.runInThisContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }));
 const App = global.App;
 const { cards } = require('./fixtures');
@@ -78,6 +78,15 @@ function giveHand(d, p, names) {
   const mixed = await App.deckgen.build('Lunalight', { format: 'tcg', archetypes: ['Lunalight', 'Snake-Eye'], signature: ['Gemini Elf'] });
   check(mixed.main.includes(byName('Snake-Eye Ash').id) && mixed.main.includes(byName('Lunalight Yellow Marten').id) && mixed.main.includes(byName('Gemini Elf').id), 'multi-archetype decks mix both pools and include signature cards from outside them');
   check(App.characters.list().length >= 15 && App.characters.list().every((c) => c.archetypes.length && c.signature.indexOf(c.ace) !== -1 || c.signature.length), 'every character has archetypes and signature cards');
+  check(App.characters.list().length >= 26 && ['yuto', 'yugo', 'yuri', 'zarc', 'ai', 'soulburner', 'revolver', 'blueangel', 'goonizuka'].every((id) => App.characters.get(id)), 'new rivals: Yuto, Yugo, Yuri, Zarc, Ai, Soulburner, Revolver, Blue Angel and Go Onizuka');
+  check(new Set(App.characters.list().map((c) => c.id)).size === App.characters.list().length, 'every character has a unique id');
+
+  console.log('Duelist profile');
+  App.profile.record('zarc', true); App.profile.record('zarc', false); App.profile.record(null, true);
+  const prof = App.profile.get();
+  check(prof.wins === 2 && prof.losses === 1 && App.profile.vs('zarc').w === 1 && App.profile.vs('zarc').l === 1 && App.profile.vs('yugi').w === 0, 'wins and losses are recorded overall and per rival');
+  check(App.profile.rank(0) === 'Rookie Duelist' && App.profile.rank(3) === 'Duelist' && App.profile.rank(10) === 'Expert Duelist' && App.profile.nextRank().title === 'Duelist', 'ranks go up with wins');
+  check(App.profile.setName('  Kaiba Fan  ') === 'Kaiba Fan' && App.profile.name() === 'Kaiba Fan', 'your duelist name is saved (trimmed)');
   Object.assign(App.api, realApi);
 
   console.log('Summoning materials');

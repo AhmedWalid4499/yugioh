@@ -17,7 +17,10 @@
     hit: [1.6, 0.05, 90, 0.005, 0.04, 0.32, 2, 2.4, -6, 0, 0, 0, 0, 0.6, 0, 0.25, 0, 0.5, 0.05],
     explode: [2, 0.1, 70, 0.01, 0.12, 0.7, 4, 2.2, 0, 0, 0, 0, 0, 1.2, 0, 0.5, 0, 0.45, 0.2],
     damage: [1.2, 0.05, 330, 0.01, 0.08, 0.35, 1, 1.6, -8, 0, 0, 0, 0, 0.4, 0, 0.1, 0, 0.7, 0.05],
-    shimmer: [0.6, 0, 660, 0.02, 0.25, 0.5, 0, 1.6, 0, 0, 330, 0.07, 0.11, 0, 0, 0, 0.08, 0.6, 0.1]
+    shimmer: [0.6, 0, 660, 0.02, 0.25, 0.5, 0, 1.6, 0, 0, 330, 0.07, 0.11, 0, 0, 0, 0.08, 0.6, 0.1],
+    // Menus: a short blip when moving, a whoosh for screen changes.
+    tick: [0.35, 0, 1200, 0, 0.01, 0.03, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.01],
+    whoosh: [0.7, 0.05, 220, 0.06, 0.12, 0.35, 4, 1, 12, 0, 0, 0, 0, 1.2, 0, 0, 0, 0.4, 0.1]
   };
 
   const state = Object.assign({ on: true, volume: 0.6 }, U.store.get(KEY, {}));
@@ -76,6 +79,10 @@
       case 'lose': sample('lose'); break;
       case 'invalid': sample('invalid', 0.6); break;
       case 'click': sample('click', 0.4); break;
+      case 'menu-move': synth('tick', 0.6); break;
+      case 'menu-ok': sample('click', 0.6); synth('shimmer', 0.35); break;
+      case 'whoosh': synth('whoosh'); break;
+      case 'vs': synth('hit', 0.9); synth('shimmer', 0.6); break;
       default: break;
     }
   }

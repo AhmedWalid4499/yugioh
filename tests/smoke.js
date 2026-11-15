@@ -86,15 +86,24 @@ function apiResponse(url) {
 
   const shot = async (name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png'), fullPage: false }); };
 
-  console.log('Home');
+  console.log('Title screen & main menu');
   await page.goto(URL_BASE);
-  await page.waitForSelector('.home-tile');
-  check((await page.locator('.home-tile').count()) === 4 && (await page.locator('[data-nav="home"].active').count()) === 1, 'the app opens on the Home page with its 4 shortcuts');
-  check((await page.locator('.first-steps').count()) === 1, 'first-time visitors see the 3-step guide');
-  await page.fill('.hero-search input', 'dark magician');
-  await page.press('.hero-search input', 'Enter');
+  await page.waitForSelector('.title-screen');
+  check((await page.textContent('.ts-logo')).trim() === 'Duel Vault', 'the app opens on a title screen');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.title-screen', { state: 'detached' });
+  check((await page.locator('.mm-item').count()) >= 6 && (await page.locator('[data-nav="home"].active').count()) === 1, 'pressing Start opens the main menu');
+  check((await page.getAttribute('.mm-item.on', 'data-item')) === 'duel' && (await page.locator('.pv-duel .btn-primary').count()) === 1, 'Free Duel is highlighted with today\'s rival');
+  await page.keyboard.press('ArrowDown');
+  check((await page.getAttribute('.mm-item.on', 'data-item')) === 'decks', 'arrow keys move through the menu');
+  await page.hover('.mm-item[data-item="search"]');
+  await page.fill('.pv-search input', 'dark magician');
+  await page.press('.pv-search input', 'Enter');
   await page.waitForFunction(() => location.hash.indexOf('#/search?q=dark') === 0);
-  check(true, 'searching from Home opens Card Search with the query');
+  check(true, 'searching from the menu opens Card Search with the query');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => location.hash === '#/home');
+  check(true, 'Esc goes back to the main menu');
   await page.goto(URL_BASE + '#/help');
   check((await page.locator('.glossary dt').count()) >= 10 && (await page.locator('#help-duel .help-steps').count()) === 1, 'Help page explains duels and Yu-Gi-Oh! words');
 
@@ -348,9 +357,12 @@ function apiResponse(url) {
   console.log('Famous duelists');
   await page.goto(URL_BASE + '#/duel');
   await page.waitForSelector('.char-tile');
-  check((await page.locator('.char-tile').count()) >= 15, 'the duel screen offers famous duelists to pick');
+  check((await page.locator('.char-tile').count()) >= 26 && (await page.locator('.char-tile[data-char="zarc"]').count()) === 1 && (await page.locator('.char-tile[data-char="ai"]').count()) === 1, 'the rival select offers every famous duelist, including Zarc and Ai');
+  await page.click('[data-series="VRAINS"]');
+  check(await page.isHidden('.char-tile[data-char="yugi"]') && await page.isVisible('.char-tile[data-char="ai"]'), 'series tabs filter the rivals');
+  await page.click('[data-series="All"]');
   await page.click('.char-tile[data-char="yugi"]');
-  check((await page.inputValue('#duel-form [name=theirs]')) === '__char:yugi', 'clicking Yugi selects him as the opponent');
+  check((await page.inputValue('#duel-form [name=theirs]')) === '__char:yugi' && (await page.textContent('.sl-name')) === 'Yugi Muto', 'clicking Yugi selects him and shows him in the spotlight');
   await page.evaluate(() => { document.querySelector('.more-options').open = true; });
   await page.selectOption('#duel-form [name=first]', 'opp');
   await page.check('#duel-form [name=ai][value=bot]');

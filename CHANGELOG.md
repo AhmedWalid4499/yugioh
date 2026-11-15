@@ -2,6 +2,23 @@
 
 Each `## <version>` section becomes the "What's new" text shown in the app's update dialog and on the GitHub Release page.
 
+## 1.7.0
+- **A new game-style look:** a midnight duel-arena theme with gold and cyan light, game-style windows, buttons and menu bar.
+- **Title screen:** the app opens on an animated title screen. Press **Start** (click or Enter) to begin.
+- **Main menu:**
+  - Choose Free Duel, Deck Editor, Auto-Build, Card Database, New Releases or Help.
+  - Move with the arrow keys or mouse; a big preview shows what each choice does, and Free Duel features *today's rival*.
+  - Press **Esc** on any page to come back to the menu.
+- **Your duelist profile:** set your duelist name, and earn ranks from *Rookie Duelist* to *Legendary Duelist* as you win. Your wins and losses are counted overall and against each rival.
+- **Rival select:**
+  - A fighting-game style roster with a big spotlight on the selected rival, tabs for each series, and a ★ on every rival you've beaten.
+  - A **VS screen** plays before each duel, and the results screen shows your record.
+- **9 new rivals:**
+  - ARC-V: **Yuto** (Phantom Knights), **Yugo** (Speedroid / Clear Wing), **Yuri** (Predaplant) and **Zarc** (Supreme King).
+  - VRAINS: **Ai** (@Ignister), **Soulburner** (Salamangreat), **Revolver** (Rokket / Borrel), **Blue Angel** (Trickstar) and **Go Onizuka** (Gouki).
+  - That makes 26 duelists in all.
+- **Menu sounds** when you move through menus, confirm a choice or start a duel.
+
 ## 1.6.0
 - **New Home page:** search for a card straight away, jump to any part of the app, carry on with your decks or an unfinished duel, and challenge a duelist in one click. First-time visitors get a 3-step guide.
 - **Simpler duel setup:**

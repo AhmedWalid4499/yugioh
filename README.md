@@ -4,9 +4,16 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 
 ## What it does
 
-### 🏠 Home and Help
-- **Home** is the first page you see. It has a card search box, one-click shortcuts to every part of the app, your latest decks, a link back to an unfinished duel, and a quick-duel row of famous duelists. First-time visitors also see a 3-step guide.
+### 🎮 Title screen, main menu and profile
+- The app opens on an animated **title screen**. Press **Start** (click, or press Enter) to begin.
+- **Main menu:**
+  - Choose Free Duel, Deck Editor, Auto-Build, Card Database, New Releases or Help & Guide.
+  - Move with the mouse or the arrow keys; a large preview shows what each choice does.
+  - Free Duel features *today's rival*.
+  - Press **Esc** on any page to come back to the menu.
+- **Your duelist profile:** click your name to change it. Ranks go from *Rookie Duelist* to *Legendary Duelist* as you win. Wins and losses are counted overall and against each rival.
 - **❓ Help** explains every page and how to duel, lists common Yu-Gi-Oh! words, and answers frequent questions. On the duel board, press **?** to open the same guide.
+- The look is an original midnight duel-arena theme made with CSS and SVG. It doesn't use any game's or show's artwork; card pictures come from YGOPRODeck.
 
 ### 🔍 Card Search
 - Search every card by name, with filters for card type, sub-type, attribute, level/rank, archetype and banlist status.
@@ -96,7 +103,7 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 - **Portraits** next to each duelist's name: their ace card by default, or any picture you choose with 📷 (saved on your device only). Official character artwork isn't included because it's copyrighted.
 
 ### 🌟 Famous duelists
-Pick an opponent from the anime, each with a **modern version of their deck**. It's built live from the newest support cards in the database and always includes their ace and signature cards:
+Pick a rival from the 26 duelists on the fighting-game style rival select (with series tabs and a ★ on every rival you've beaten), each with a **modern version of their deck**. It's built live from the newest support cards in the database and always includes their ace and signature cards:
 
 | Series | Duelists |
 | --- | --- |
@@ -104,10 +111,10 @@ Pick an opponent from the anime, each with a **modern version of their deck**. I
 | GX | Jaden (Elemental HERO), Zane (Cyber Dragon), Aster (Destiny HERO), Chazz (Armed Dragon) |
 | 5D's | Yusei (Synchron/Junk/Stardust), Jack (Red Dragon Archfiend), Crow (Blackwing), Akiza (Rose Dragon) |
 | ZEXAL | Yuma (Utopia), Kite (Galaxy-Eyes/Photon) |
-| ARC-V | Yuya (Performapal/Odd-Eyes) |
-| VRAINS | Playmaker (Code Talker) |
+| ARC-V | Yuya (Performapal/Odd-Eyes), Yuto (Phantom Knights), Yugo (Speedroid/Clear Wing), Yuri (Predaplant), Zarc (Supreme King) |
+| VRAINS | Playmaker (Code Talker), Ai (@Ignister), Soulburner (Salamangreat), Revolver (Rokket/Borrel), Blue Angel (Trickstar), Go Onizuka (Gouki) |
 
-The built-in bot or Claude can play any of them; with Claude, comments come in the character's voice. To use one of their decks yourself, pick them on the Auto-Build page.
+A VS screen plays before each duel. The built-in bot or Claude can play any of them; with Claude, comments come in the character's voice. To use one of their decks yourself, pick them on the Auto-Build page.
 
 ### 📜 Formats (rulings)
 Pick the format per deck (in the deck builder) and per duel. It sets the banlist, deck sizes, card legality, LP, hand size and zones:

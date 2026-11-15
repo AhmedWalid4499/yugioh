@@ -67,7 +67,14 @@
   }, true);
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !document.getElementById('modal').hidden) C.closeModal();
+    if (e.key !== 'Escape') return;
+    if (!document.getElementById('modal').hidden) { C.closeModal(); return; }
+    // Esc goes back to the main menu, like a game (not from the duel board, to avoid accidents).
+    if (document.body.classList.contains('title-open') || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    const h = location.hash;
+    if (h === '#/home' || h.indexOf('#/duel/play') === 0) return;
+    App.sound.play('menu-move');
+    location.hash = '#/home';
   });
 
   window.addEventListener('hashchange', () => {
@@ -75,5 +82,8 @@
     App.router();
   });
 
+  const firstLoad = !location.hash || location.hash === '#/' || location.hash === '#/home';
   App.router();
+  // The title screen greets you once per session when the app opens on the menu.
+  if (firstLoad && !App.game.titleSeen()) App.game.titleScreen();
 })(window.App);
