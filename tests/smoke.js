@@ -100,7 +100,12 @@ function apiResponse(url) {
   await page.fill('.pv-search input', 'dark magician');
   await page.press('.pv-search input', 'Enter');
   await page.waitForFunction(() => location.hash.indexOf('#/search?q=dark') === 0);
-  check(true, 'searching from the menu opens Card Search with the query');
+  // Wait for the Card Search page itself, not just the address: the page renders on hashchange.
+  await page.waitForSelector('[data-nav="search"].active');
+  check((await page.inputValue('.search-input')) === 'dark magician', 'searching from the menu opens Card Search with the query');
+  await page.focus('.search-input');
+  await page.keyboard.press('Escape');
+  check(await page.evaluate(() => document.activeElement.classList.contains('search-input') === false && location.hash.indexOf('#/search') === 0), 'Esc in a text box only leaves the box');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => location.hash === '#/home');
   check(true, 'Esc goes back to the main menu');
