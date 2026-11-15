@@ -124,7 +124,8 @@
   /* Looks up cards by name (as typed in a spreadsheet). Returns an object
      keyed by the normalised input name. Tries exact names in batches first,
      then a fuzzy search for anything left over. */
-  api.getCardsByNames = async function (names) {
+  api.getCardsByNames = async function (names, opts) {
+    const misc = opts && opts.misc ? 'yes' : undefined;
     const unique = Array.from(new Set(names.map((n) => String(n).trim()).filter(Boolean)));
     const found = {};
     const want = new Set(unique.map(normName));
@@ -136,7 +137,7 @@
     for (let i = 0; i < unique.length; i += 20) {
       const chunk = unique.slice(i, i + 20);
       try {
-        const res = await request('cardinfo.php', { name: chunk.join('|') });
+        const res = await request('cardinfo.php', { name: chunk.join('|'), misc: misc });
         (res.data || []).forEach(take);
       } catch (e) { /* fall through to one-by-one */ }
     }
@@ -145,7 +146,7 @@
       const k = normName(n);
       if (found[k]) continue;
       try {
-        const res = await request('cardinfo.php', { fname: n });
+        const res = await request('cardinfo.php', { fname: n, misc: misc });
         const list = res.data || [];
         list.forEach(take);
         if (!found[k] && list.length) {
@@ -161,8 +162,8 @@
 
   api.normName = normName;
 
-  api.getArchetypeCards = async function (name) {
-    const res = await request('cardinfo.php', { archetype: name });
+  api.getArchetypeCards = async function (name, opts) {
+    const res = await request('cardinfo.php', { archetype: name, misc: opts && opts.misc ? 'yes' : undefined });
     return res.data || [];
   };
 
@@ -216,8 +217,9 @@
     return 'monster';
   };
 
-  /* Max copies allowed under the current TCG banlist. */
-  api.copyLimit = function (card) {
+  /* Max copies allowed in a format (TCG banlist by default). */
+  api.copyLimit = function (card, formatKey) {
+    if (App.formats) return App.formats.copyLimit(card, formatKey || 'tcg');
     const ban = card && card.banlist_info && card.banlist_info.ban_tcg;
     if (ban === 'Banned' || ban === 'Forbidden') return 0;
     if (ban === 'Limited') return 1;

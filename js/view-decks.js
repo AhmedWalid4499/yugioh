@@ -46,7 +46,7 @@
     const decks = D.all();
     view.innerHTML = '<section class="page">' +
       '<div class="page-head row-between"><div><h1>My Decks</h1><p class="muted">Decks are saved in this browser. Export them as .ydk files to back them up or use them in simulators.</p></div>' +
-        '<div class="row"><button type="button" class="btn btn-primary" id="new-deck">+ New deck</button><button type="button" class="btn" id="import-toggle">Import deck</button></div></div>' +
+        '<div class="row"><a class="btn btn-primary" href="#/build">⚡ Auto-build</a><button type="button" class="btn" id="new-deck">+ New deck</button><button type="button" class="btn" id="import-toggle">Import deck</button></div></div>' +
       '<div class="panel" id="import-panel" hidden>' +
         '<h3>Import a deck</h3>' +
         '<p class="muted small">Choose an <strong>Excel sheet (.xlsx)</strong> or <strong>.csv</strong> with card names and quantities, or a <strong>.ydk</strong> file (from YGOPRODeck, EDOPro, Dueling Book…). You can also paste .ydk text below.</p>' +
@@ -63,7 +63,7 @@
             '<a class="deck-cover" href="#/deck/' + esc(d.id) + '">' + (cover ? '<img loading="lazy" src="' + esc(cover) + '" alt="">' : '<span>◆</span>') + '</a>' +
             '<div class="deck-card-body">' +
               '<a class="deck-title" href="#/deck/' + esc(d.id) + '">' + esc(d.name) + '</a>' +
-              '<div class="muted small">Main ' + d.main.length + ' · Extra ' + d.extra.length + ' · Side ' + d.side.length + '</div>' +
+              '<div class="muted small">' + esc(App.formats.get(d.format).short) + ' · Main ' + d.main.length + ' · Extra ' + d.extra.length + ' · Side ' + d.side.length + '</div>' +
               '<div class="small ' + (problems.length ? 'warn' : 'ok') + '">' + (problems.length ? '⚠ ' + U.plural(problems.length, 'issue') : '✓ Tournament legal') + '</div>' +
               '<div class="muted small">Edited ' + esc(new Date(d.updated).toLocaleDateString()) + '</div>' +
               '<div class="row">' +
@@ -188,8 +188,10 @@
     const groups = group(ids);
     const k = kindCounts(ids);
     const breakdown = zone === 'extra' ? '' : ' <span class="muted small">' + k.monster + ' monsters · ' + k.spell + ' spells · ' + k.trap + ' traps</span>';
-    const range = zone === 'main' ? '40–60' : '0–15';
-    const bad = zone === 'main' ? (ids.length < 40 || ids.length > 60) : ids.length > 15;
+    const f = App.formats.get(deck.format);
+    const max = D.zoneMax(deck, zone);
+    const range = zone === 'main' ? f.main[0] + '–' + f.main[1] : '0–' + max;
+    const bad = zone === 'main' ? (ids.length < f.main[0] || ids.length > max) : ids.length > max;
     return '<section class="zone zone-' + zone + '">' +
       '<h3>' + D.zoneName(zone) + ' <span class="count' + (bad ? ' warn' : '') + '">' + ids.length + '</span><span class="muted small"> / ' + range + '</span>' + breakdown + '</h3>' +
       (groups.length
@@ -239,21 +241,23 @@
 
     const advice = [];
     if (N && starters < 8) advice.push('Only ' + starters + ' starter' + (starters === 1 ? '' : 's') + ' detected. Many competitive decks aim for 8–12 so they open a play most games.');
-    if (N >= 40 && handtraps === 0) advice.push('No hand traps detected. Adding a few (e.g. Ash Blossom & Joyous Spring) helps you interact on your opponent\'s turn.');
-    if (N > 40) advice.push('Your Main Deck is over 40 — every extra card lowers the chance of drawing your best ones.');
-    if (deck.extra.length && deck.extra.length < 15) advice.push('You have ' + (15 - deck.extra.length) + ' free Extra Deck slots — extra options cost nothing in consistency.');
+    const f = App.formats.get(deck.format);
+    const handSize = f.hand;
+    if (N >= f.main[0] && handtraps === 0 && deck.format !== 'goat') advice.push('No hand traps detected. Adding a few (e.g. Ash Blossom & Joyous Spring) helps you interact on your opponent\'s turn.');
+    if (N > f.main[0]) advice.push('Your Main Deck is over ' + f.main[0] + ' — every extra card lowers the chance of drawing your best ones.');
+    if (deck.extra.length && deck.extra.length < f.extra) advice.push('You have ' + (f.extra - deck.extra.length) + ' free Extra Deck slots — extra options cost nothing in consistency.');
 
     const roleRow = (key, label) => roleCount[key]
-      ? '<tr><td><span class="chip role-' + key + '">' + label + '</span></td><td>' + roleCount[key] + '</td><td>' + odds(roleCount[key], 5) + '%</td><td>' + odds(roleCount[key], 6) + '%</td></tr>'
+      ? '<tr><td><span class="chip role-' + key + '">' + label + '</span></td><td>' + roleCount[key] + '</td><td>' + odds(roleCount[key], handSize) + '%</td><td>' + odds(roleCount[key], handSize + 1) + '%</td></tr>'
       : '';
 
     return '<section class="panel stats">' +
       '<h3>Deck check</h3>' +
       (problems.length
         ? '<ul class="problems">' + problems.map((p) => '<li>⚠ ' + esc(p) + '</li>').join('') + '</ul>'
-        : '<p class="ok">✓ Legal under the current TCG banlist and deck-size rules.</p>') +
+        : '<p class="ok">✓ Legal in ' + esc(f.label) + ' (banlist and deck-size rules).</p>') +
       (topArch.length ? '<p class="small">Main strategy: ' + topArch.map((a) => '<a href="#/archetype/' + encodeURIComponent(a) + '">' + esc(a) + '</a> (' + archCounts[a] + ')').join(', ') + '</p>' : '') +
-      (N ? '<h4>Opening hand odds</h4><table class="table small"><thead><tr><th>Role</th><th>Cards</th><th>Going 1st (5)</th><th>Going 2nd (6)</th></tr></thead><tbody>' +
+      (N ? '<h4>Opening hand odds</h4><table class="table small"><thead><tr><th>Role</th><th>Cards</th><th>Going 1st (' + handSize + ')</th><th>Going 2nd (' + (handSize + 1) + ')</th></tr></thead><tbody>' +
         roleRow('starter', 'Starter') + roleRow('searcher', 'Searcher') + roleRow('extender', 'Extender') + roleRow('handtrap', 'Hand Trap') +
         roleRow('negate', 'Negation') + roleRow('removal', 'Removal') +
         '</tbody></table><p class="muted small">Chance to open at least one card with that role. Roles are detected from card text.</p>' : '') +
@@ -273,6 +277,9 @@
       '<div class="page-head row-between">' +
         '<div><a class="back" href="#/decks">← My Decks</a><input class="deck-name" id="deck-name" value="' + esc(deck.name) + '" aria-label="Deck name"></div>' +
         '<div class="row">' +
+          '<label class="small">Format <select id="deck-format" aria-label="Format">' + App.formats.options(deck.format) + '</select></label>' +
+          '<a class="btn btn-primary" href="#/test/' + esc(deck.id) + '">🃏 Test hands</a>' +
+          '<a class="btn btn-primary" href="#/duel?deck=' + esc(deck.id) + '">⚔ Duel</a>' +
           '<button type="button" class="btn" id="deck-excel">Export Excel</button>' +
           '<button type="button" class="btn" id="deck-export">Export .ydk</button>' +
           '<button type="button" class="btn" id="deck-copy">Copy card list</button>' +
@@ -353,6 +360,14 @@
       D.save(d);
     }, 500));
     U.$('#deck-export', view).addEventListener('click', () => exportDeck(current()));
+    U.$('#deck-format', view).addEventListener('change', (e) => {
+      const d = current();
+      d.format = e.target.value;
+      D.save(d);
+      U.store.set('dv-default-format', d.format);
+      renderDeck();
+      U.toast('Format set to ' + App.formats.get(d.format).label + '.');
+    });
     U.$('#deck-excel', view).addEventListener('click', (e) => exportExcel(current(), e.currentTarget));
     U.$('#deck-copy', view).addEventListener('click', async () => {
       const txt = textList(current());

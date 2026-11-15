@@ -60,7 +60,7 @@
 
   function notesHtml(notes) {
     if (!notes) return '';
-    return '<div class="panel"><h3>What\'s new</h3><p class="card-text">' + esc(notes).replace(/\n/g, '<br>') + '</p></div>';
+    return '<div class="panel"><h3>What\'s new</h3><p class="card-text">' + esc(notes).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>') + '</p></div>';
   }
 
   function showDetails() {

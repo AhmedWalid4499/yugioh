@@ -20,7 +20,11 @@
     [/^\/set\/(.+)$/, (v, m) => App.views.set(v, decodeURIComponent(m[1])), 'releases'],
     [/^\/decks$/, (v) => App.views.decks(v), 'decks'],
     [/^\/deck\/([\w-]+)$/, (v, m, p) => App.views.deck(v, m[1], p), 'decks'],
-    [/^\/card\/(\d+)$/, (v, m, p) => { App.views.search(v, p); C.openCard(m[1]); }, 'search']
+    [/^\/card\/(\d+)$/, (v, m, p) => { App.views.search(v, p); C.openCard(m[1]); }, 'search'],
+    [/^\/build$/, (v, m, p) => App.views.build(v, p), 'build'],
+    [/^\/test\/([\w-]+)$/, (v, m) => App.views.test(v, m[1]), 'decks'],
+    [/^\/duel$/, (v, m, p) => App.views.duelSetup(v, p), 'duel'],
+    [/^\/duel\/play$/, (v) => App.views.duelPlay(v), 'duel']
   ];
 
   App.router = function () {
