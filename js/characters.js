@@ -119,11 +119,74 @@
       persona: 'a showman who wants to make everyone smile'
     },
     {
+      id: 'yuto', color: '#6c5ce7', name: 'Yuto', short: 'Yuto', series: 'ARC-V', ace: 'Dark Rebellion Xyz Dragon',
+      archetypes: ['Phantom Knights'],
+      signature: ['Dark Rebellion Xyz Dragon', 'The Phantom Knights of Ancient Cloak', 'The Phantom Knights of Silent Boots', 'The Phantom Knights of Break Sword', 'Phantom Knights\' Fog Blade', 'Dark Requiem Xyz Dragon'],
+      style: 'Phantom Knights that Xyz Summon into Dark Rebellion Xyz Dragon.',
+      persona: 'a quiet resistance fighter who duels to protect his friends'
+    },
+    {
+      id: 'yugo', color: '#00a8ff', name: 'Yugo', short: 'Yugo', series: 'ARC-V', ace: 'Clear Wing Synchro Dragon',
+      archetypes: ['Speedroid', 'Clear Wing'],
+      signature: ['Clear Wing Synchro Dragon', 'Speedroid Terrortop', 'Speedroid Taketomborg', 'Speedroid Den-Den Daiko Duke', 'Hi-Speedroid Chanbara', 'Crystal Wing Synchro Dragon', 'Clear Wing Fast Dragon'],
+      style: 'Speedroids that race into Synchro Summons of Clear Wing Synchro Dragon.',
+      persona: 'hot-headed, fast-talking and proud of his riding duels (and it\'s Yu-GO, not Yu-YA)'
+    },
+    {
+      id: 'yuri', color: '#9b59b6', name: 'Yuri', short: 'Yuri', series: 'ARC-V', ace: 'Starving Venom Fusion Dragon',
+      archetypes: ['Predaplant', 'Starving Venom'],
+      signature: ['Starving Venom Fusion Dragon', 'Predaplant Ophrys Scorpio', 'Predaplant Chlamydosundew', 'Predaplant Verte Anaconda', 'Predaplast', 'Greedy Venom Fusion Dragon', 'Predaplant Dragostapelia'],
+      style: 'Predaplants that Fusion Summon Starving Venom Fusion Dragon.',
+      persona: 'polite on the surface, cruel and mocking underneath'
+    },
+    {
+      id: 'zarc', color: '#b71540', name: 'Zarc', short: 'Zarc', series: 'ARC-V', ace: 'Supreme King Z-ARC',
+      archetypes: ['Supreme King', 'Odd-Eyes'],
+      signature: ['Supreme King Z-ARC', 'Supreme King Dragon Darkwurm', 'Supreme King Gate Zero', 'Supreme King Gate Infinity', 'Supreme King Dragon Odd-Eyes', 'Supreme King Dragon Starving Venom', 'Supreme King Dragon Clear Wing', 'Supreme King Dragon Dark Rebellion'],
+      style: 'The Supreme King: Pendulum gates and the four dimension dragons, all leading to Z-ARC.',
+      persona: 'the Supreme King Dragon; menacing, overwhelming and hungry for destruction'
+    },
+    {
       id: 'playmaker', color: '#1abc9c', name: 'Playmaker (Yusaku Fujiki)', short: 'Playmaker', series: 'VRAINS', ace: 'Decode Talker',
       archetypes: ['Code Talker', 'Cynet'],
       signature: ['Decode Talker', 'Encode Talker', 'Firewall Dragon', 'Cyberse Wizard', 'Code of Soul'],
       style: 'Cyberse Link Summons into Code Talkers.',
       persona: 'calm, analytical and few words'
+    },
+    {
+      id: 'ai', color: '#8e44ad', name: 'Ai', short: 'Ai', series: 'VRAINS', ace: 'The Arrival Cyberse @Ignister',
+      archetypes: ['@Ignister', 'A.I.'],
+      signature: ['The Arrival Cyberse @Ignister', 'Dark Templar @Ignister', 'Wizard @Ignister', 'Achichi @Ignister', 'Hiyari @Ignister', 'Doshin @Ignister', 'A.I. Love Fusion'],
+      style: '@Ignister Cyberse monsters that Link Summon The Arrival Cyberse @Ignister.',
+      persona: 'the chatty, cheeky DARK Ignis who loves jokes and showing off'
+    },
+    {
+      id: 'soulburner', color: '#e67e22', name: 'Soulburner (Takeru Homura)', short: 'Soulburner', series: 'VRAINS', ace: 'Salamangreat Heatleo',
+      archetypes: ['Salamangreat'],
+      signature: ['Salamangreat Heatleo', 'Salamangreat Gazelle', 'Salamangreat Circle', 'Salamangreat Foxer', 'Salamangreat Sunlight Wolf', 'Salamangreat Almiraj', 'Salamangreat Raging Phoenix'],
+      style: 'Fiery Salamangreats that Link Summon and reincarnate their own Link Monsters.',
+      persona: 'fiery, passionate and loyal to his partner Flame'
+    },
+    {
+      id: 'revolver', color: '#7f8fa6', name: 'Revolver', short: 'Revolver', series: 'VRAINS', ace: 'Borreload Dragon',
+      archetypes: ['Rokket', 'Borrel'],
+      signature: ['Borreload Dragon', 'Absorouter Dragon', 'Quick Launch', 'Rokket Tracer', 'Rokket Recharger', 'Borrelsword Dragon', 'Borreload Savage Dragon'],
+      style: 'Rokket Dragons that fire into Borrel Link Monsters.',
+      persona: 'cold, precise leader of the Knights of Hanoi'
+    },
+    {
+      id: 'blueangel', color: '#74b9ff', name: 'Blue Angel (Skye Zaizen)', short: 'Blue Angel', series: 'VRAINS', ace: 'Trickstar Holly Angel',
+      archetypes: ['Trickstar'],
+      signature: ['Trickstar Holly Angel', 'Trickstar Candina', 'Trickstar Lycoris', 'Trickstar Light Stage', 'Trickstar Reincarnation'],
+      style: 'Trickstars that burn your LP every time you add cards to your hand.',
+      persona: 'a cheerful idol duelist who is tougher than she looks'
+    },
+    {
+      id: 'goonizuka', color: '#d35400', name: 'Go Onizuka', short: 'Go', series: 'VRAINS', ace: 'Gouki The Great Ogre',
+      archetypes: ['Gouki'],
+      signature: ['Gouki The Great Ogre', 'Gouki Twistcobra', 'Gouki Suprex', 'Gouki Headbatt', 'Gouki Re-Match', 'Gouki The Powerload Ogre'],
+      style: 'Gouki wrestlers that tag in and Link Summon The Great Ogre.',
+      persona: 'a charismatic pro wrestler of a duelist who plays to the crowd'
     }
   ];
 

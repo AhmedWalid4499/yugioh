@@ -85,7 +85,9 @@ async function mockApis(app) {
   win.on('pageerror', (e) => errors.push(e.message));
 
   console.log('Desktop app');
-  await win.waitForSelector('.home-tile', { timeout: 20000 });
+  await win.waitForSelector('.title-screen', { timeout: 20000 });
+  await win.click('.title-screen');
+  await win.waitForSelector('.mm-item', { timeout: 20000 });
   check(/^app:\/\/duel-vault\//.test(win.url()), 'loads the web app from the private app:// address');
   check((await win.title()) === 'Duel Vault', 'window title is Duel Vault');
   check((await win.textContent('#app-version')).trim() === 'v' + require('../package.json').version, 'footer shows the installed version (v' + require('../package.json').version + ')');

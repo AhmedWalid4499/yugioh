@@ -77,6 +77,35 @@
 
   /* ---------- setup ---------- */
 
+  const SERIES = ['All', 'Duel Monsters', 'GX', '5D\'s', 'ZEXAL', 'ARC-V', 'VRAINS'];
+
+  /* Fighting-game style rival select: a big spotlight and a grid of faces. */
+  function roster(selId) {
+    const chars = App.characters.list();
+    return '<div class="roster"><div class="spotlight" id="spotlight">' + spotlightHtml(selId) + '</div>' +
+      '<div class="roster-side"><div class="series-tabs" role="tablist">' + SERIES.map((x, i) => '<button type="button" class="series-tab' + (i === 0 ? ' on' : '') + '" data-series="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div>' +
+      '<div class="roster-grid">' + chars.map((c) => {
+        const r = App.profile.vs(c.id);
+        const custom = App.characters.portrait(c.id);
+        return '<button type="button" class="char-tile roster-face' + (c.id === selId ? ' selected' : '') + '" data-char="' + c.id + '" data-series-of="' + esc(c.series) + '" style="--ring:' + c.color + '" title="' + esc(c.name) + '">' +
+          '<span class="char-art"' + (custom ? ' style="background-image:url(\'' + custom + '\')"' : ' data-ace="' + esc(c.ace) + '"') + '></span>' +
+          '<span class="char-name">' + esc(c.short) + '</span>' + (r.w ? '<span class="beaten" title="Beaten">★</span>' : '') + '</button>';
+      }).join('') + '</div><p class="muted small">Each rival plays a modern version of their deck, built from the newest cards.</p></div></div>';
+  }
+
+  function spotlightHtml(id) {
+    const c = id && App.characters.get(id);
+    if (!c) return '<div class="sl-empty muted">Pick a rival →</div>';
+    const r = App.profile.vs(c.id);
+    const custom = App.characters.portrait(c.id);
+    return '<div class="sl-art char-art"' + (custom ? ' style="background-image:url(\'' + custom + '\');--ring:' + c.color + '"' : ' data-ace="' + esc(c.ace) + '" style="--ring:' + c.color + '"') + '></div>' +
+      '<div class="sl-info" style="--ring:' + c.color + '"><div class="sl-series">' + esc(c.series) + '</div><div class="sl-name">' + esc(c.name) + '</div>' +
+      '<div class="sl-deck">' + esc(c.archetypes[0]) + ' · Ace: ' + esc(c.ace) + '</div><p class="sl-style">' + esc(c.style) + '</p>' +
+      '<div class="sl-rec">' + (r.w + r.l ? '<span class="w">' + r.w + ' W</span> <span class="l">' + r.l + ' L</span>' + (r.w ? ' <span class="beaten-tag">★ Beaten</span>' : '') : '<span class="muted">Not faced yet</span>') + '</div>' +
+      '<div class="sl-photo"><label class="btn btn-small btn-ghost" title="Use your own picture for ' + esc(c.short) + '">📷 Picture<input type="file" accept="image/*" data-portrait="' + c.id + '" hidden></label>' +
+      (custom ? '<button type="button" class="btn btn-small btn-ghost" data-portrait-clear="' + c.id + '">Reset</button>' : '') + '</div></div>';
+  }
+
   function setupPage(view, params) {
     const decks = D.all();
     const chars = App.characters.list();
@@ -95,9 +124,8 @@
     view.innerHTML = '<section class="page duel-setup-page">' +
       '<div class="page-head"><h1>Duel</h1><p class="muted">Practise against a famous duelist. Pick your opponent and your deck, then press <strong>Start duel</strong>. Everything else is optional.</p></div>' +
       '<form id="duel-form" autocomplete="off">' +
-      '<div class="panel"><h3><span class="step-num">1</span> Choose your opponent</h3>' +
-        '<p class="muted small">Each duelist plays a modern version of their deck, built from the newest cards.</p>' +
-        App.characters.tiles(oppSel.indexOf('__char:') === 0 ? oppSel.slice(7) : null) +
+      '<div class="panel roster-panel"><h3><span class="step-num">1</span> Choose your rival</h3>' +
+        roster(oppSel.indexOf('__char:') === 0 ? oppSel.slice(7) : null) +
         '<div class="setup-grid more-opp">' +
           '<label>Or play against<select name="theirs"><optgroup label="Famous duelists">' + charOpts(oppSel) + '</optgroup>' + (decks.length ? '<optgroup label="Your decks">' + deckOpts(oppSel) + '</optgroup>' : '') +
             '<option value="__auto"' + (oppSel === '__auto' ? ' selected' : '') + '>A deck auto-built from an archetype…</option>' +
@@ -141,12 +169,30 @@
     const form = U.$('#duel-form', view);
     App.characters.paintArt(view);
     App.characters.wirePortraits(view, () => App.router());
+    const showSpot = (id) => { U.$('#spotlight', view).innerHTML = spotlightHtml(id); App.characters.paintArt(U.$('#spotlight', view)); };
     view.addEventListener('click', (e) => {
+      const tab = e.target.closest('[data-series]');
+      if (tab) {
+        const sr = tab.getAttribute('data-series');
+        U.$$('.series-tab', view).forEach((x) => x.classList.toggle('on', x === tab));
+        U.$$('.roster-face', view).forEach((x) => { x.hidden = sr !== 'All' && x.getAttribute('data-series-of') !== sr; });
+        App.sound.play('menu-move');
+        return;
+      }
       const t = e.target.closest('[data-char]');
       if (!t) return;
       form.theirs.value = '__char:' + t.getAttribute('data-char');
       U.$$('.char-tile', view).forEach((x) => x.classList.toggle('selected', x === t));
+      showSpot(t.getAttribute('data-char'));
+      App.sound.play('menu-ok');
       sync();
+    });
+    view.addEventListener('mouseover', (e) => {
+      const t = e.target.closest('.roster-face');
+      if (!t || t.classList.contains('hovered')) return;
+      U.$$('.roster-face.hovered', view).forEach((x) => x.classList.remove('hovered'));
+      t.classList.add('hovered');
+      App.sound.play('menu-move');
     });
     api.getArchetypes().then((l) => { U.$('#duel-archetypes', view).innerHTML = l.map((a) => '<option value="' + esc(a) + '">').join(''); }).catch(() => {});
     const deckLabel = (v, arch) => {
@@ -168,7 +214,10 @@
     };
     form.addEventListener('change', (e) => {
       if (e.target.name === 'mine') { const d = D.get(form.mine.value); if (d && d.format) form.format.value = d.format; }
-      if (e.target.name === 'theirs') U.$$('.char-tile', view).forEach((x) => x.classList.toggle('selected', '__char:' + x.getAttribute('data-char') === form.theirs.value));
+      if (e.target.name === 'theirs') {
+        U.$$('.char-tile', view).forEach((x) => x.classList.toggle('selected', '__char:' + x.getAttribute('data-char') === form.theirs.value));
+        showSpot(form.theirs.value.indexOf('__char:') === 0 ? form.theirs.value.slice(7) : null);
+      }
       sync();
     });
     form.addEventListener('input', (e) => { if (e.target.name === 'arch') sync(); });
@@ -186,10 +235,19 @@
       }
       status.textContent = 'Building decks and shuffling… this can take a few seconds.';
       btn.disabled = true;
+      const t = setup.theirs;
+      const ch = t.indexOf('__char:') === 0 ? App.characters.get(t.slice(7)) : null;
+      const fast = String(U.store.get('dv-duel-speed', '')) === '0';
+      const splash = App.game.vsSplash(
+        { avatar: App.characters.avatar('you', 'huge'), name: App.profile.name() || 'You', sub: deckLabel(setup.mine) },
+        { avatar: ch ? App.characters.avatar(ch.id, 'huge') : '<span class="avatar avatar-you huge">' + (setup.ai === 'claude' ? '✦' : '🤖') + '</span>', name: ch ? ch.name : setup.ai === 'claude' ? 'Claude' : 'Bot', sub: deckLabel(t, setup.arch) },
+        fast);
       try {
         await start(setup);
+        await splash.ready();
         location.hash = '#/duel/play';
       } catch (err) {
+        splash.fail();
         status.textContent = err.message;
         btn.disabled = false;
       }
@@ -310,7 +368,7 @@
       const mine = p === 0;
       return '<div class="pinfo ' + (mine ? 'me' : 'opp') + (duel.active === p ? ' active' : '') + '">' +
         (mine ? App.characters.avatar('you') : s.character ? App.characters.avatar(s.character) : '<span class="avatar avatar-you" style="--ring:#3fb6ff">' + (s.oppType === 'claude' ? '✦' : '🤖') + '</span>') +
-        '<div class="pname"><strong>' + esc(pl.name) + '</strong><span class="muted small">' + esc(pl.deckName) + '</span></div>' +
+        '<div class="pname"><strong>' + esc(mine ? App.profile.name() || pl.name : pl.name) + '</strong><span class="muted small">' + esc(pl.deckName) + '</span></div>' +
         '<div class="lp-box"' + (mine ? '' : ' data-drop="opp-lp"') + '><div class="lp' + (pl.lp <= duel.format.lp / 4 ? ' low' : '') + '" id="lp-' + p + '">' + pl.lp + '<small>LP</small></div>' +
           '<div class="lp-bar"><span style="width:' + Math.max(0, Math.min(100, pl.lp / duel.format.lp * 100)) + '%"></span></div></div>' +
         '<div class="piles">' +
@@ -365,6 +423,7 @@
     }
 
     function render() {
+      if (duel.winner != null && !s.recorded) { s.recorded = true; App.profile.record(s.character, duel.winner === 0); }
       const myTurn = duel.active === 0;
       const ph = duel.phase;
       const canAct = myTurn && duel.winner == null && !s.busy;
@@ -410,7 +469,9 @@
             '<ol class="duel-log" id="duel-log">' + logHtml + '</ol>' +
           '</aside>' +
         '</div>' +
-        (duel.winner != null ? '<div class="winner-banner"><h2>' + (duel.winner === 0 ? '🏆 You win!' : '💀 ' + esc(duel.pname(1)) + ' wins') + '</h2><div class="row"><button type="button" class="btn btn-primary" id="rematch">Rematch</button><a class="btn" href="#/duel">New setup</a></div></div>' : '');
+        (duel.winner != null ? '<div class="winner-banner ' + (duel.winner === 0 ? 'won' : 'lost') + '"><div class="wb-kicker">Duel over</div><h2>' + (duel.winner === 0 ? '🏆 You win!' : '💀 ' + esc(duel.pname(1)) + ' wins') + '</h2>' +
+          '<p class="wb-rec">' + (s.character ? 'Record vs ' + esc(duel.pname(1)) + ': <span class="w">' + App.profile.vs(s.character).w + ' W</span> <span class="l">' + App.profile.vs(s.character).l + ' L</span> · ' : '') + esc(App.profile.rank()) + '</p>' +
+          '<div class="row center"><button type="button" class="btn btn-primary" id="rematch">Rematch</button><a class="btn" href="#/duel">Choose a rival</a><a class="btn btn-ghost" href="#/home">Main menu</a></div></div>' : '');
       const log = U.$('#duel-log', root);
       if (log) log.scrollTop = log.scrollHeight;
       App.characters.paintArt(root);
