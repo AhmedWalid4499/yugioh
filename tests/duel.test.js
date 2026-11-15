@@ -288,6 +288,79 @@ function giveHand(d, p, names) {
   d.endTurn();
   check(!d.usedThisTurn(0, optCard), '…and reset at the start of the next turn');
 
+  console.log('Effect reader (real card texts)');
+  {
+    const real = require('./effect-cards.json');
+    const R = (n) => real.find((c) => c.name === n);
+    const E = App.Effects;
+    const card = (n, uid) => ({ uid: uid || 'r_' + n, name: n, id: R(n).id, data: R(n), owner: 0, controller: 0, faceUp: true, pos: 'atk', materials: [] });
+    const fx = (n) => E.effectsOf(card(n));
+    // Splitting into effects
+    const ash = fx('Ash Blossom & Joyous Spring');
+    check(ash.length === 1 && ash[0].type === 'quick' && ash[0].locs[0] === 'hand' && E.readCosts(ash[0])[0].type === 'self', 'Ash Blossom: one Quick Effect from the hand; its cost is discarding itself');
+    const marten = fx('Lunalight Yellow Marten');
+    check(marten.length === 2 && marten[0].locs.join() === 'hand,gy' && marten[1].event[0] === 'to-gy' && marten.every((e) => e.opt === 'effect'), 'Yellow Marten: hand-or-GY effect and a "sent to the GY" trigger, each once per turn');
+    const dmg = fx('Dark Magician Girl the Magician\'s Apprentice');
+    check(dmg[0].type === 'procedure' && dmg[1].type === 'trigger' && dmg[1].event.join() === 'normal,special' && dmg[2].type === 'continuous', 'DMG the Magician\'s Apprentice: summoning procedure, summon trigger, continuous ATK gain');
+    const pod = fx('Pot of Desires');
+    check(pod[0].type === 'activation' && E.readCosts(pod[0])[0].type === 'decktop' && E.readCosts(pod[0])[0].count === 10 && pod[0].opt === 'card', 'Pot of Desires: cost is banishing the top 10 cards; 1 per turn');
+    const ls = fx('Lightning Storm');
+    check(ls[0].modes && ls[0].modes.length === 2, 'Lightning Storm: you choose 1 of its 2 effects');
+    const gat = fx('Gatchiri @Ignister');
+    check(gat.length === 3 && gat[1].locs[0] === 'hand' && gat[2].event, 'Gatchiri: "each of the following effects" bullets are separate effects');
+    const cov = fx('Salamangreat Coyote');
+    check(cov.some((e) => e.modes && e.modes.length === 2 && /target/i.test(e.modes[0].pre) && /special summon it/i.test(e.modes[0].action)), 'Salamangreat Coyote: each option keeps its own target');
+
+    // Using them in a duel
+    const d = newDuel([byName('Gemini Elf')], [byName('Gemini Elf')]);
+    d.phase = 'main1';
+    const zoneIn = (p, zone, c) => { c.controller = p; c.owner = p; if (zone === 'hand') d.players[p].hand.push(c); else if (zone === 'gy') d.players[p].gy.push(c); else if (zone === 'mz') d.players[p].mz[d.freeMz(p)] = c; else if (zone === 'st') { d.players[p].st[d.freeSt(p)] = c; } return c; };
+    // Ash Blossom can't be used on your own turn without a chain
+    const ashC = zoneIn(0, 'hand', card('Ash Blossom & Joyous Spring', 'ashC'));
+    check(!E.options(d, 0, ashC)[0].ok && /response/i.test(E.options(d, 0, ashC)[0].why), 'Ash Blossom is only offered in response to an activation');
+    // DMG: summon trigger only after a summon, and only its own search
+    d.players[0].deck.push(Object.assign(card('Dark Magician', 'dmDeck')));
+    const dmgC = zoneIn(0, 'mz', card('Dark Magician Girl the Magician\'s Apprentice', 'dmgC'));
+    check(!E.options(d, 0, dmgC).some((x) => x.ok), 'DMG\'s summon effect can\'t be used later at will');
+    check(E.options(d, 0, dmgC, { event: 'normal' }).some((x) => x.ok), '…but it can right after she is Normal Summoned');
+    const dmgPlan = E.plan(d, 0, dmgC, { summoned: 'normal' });
+    check(dmgPlan && dmgPlan.choose && dmgPlan.choose.fromDeck && dmgPlan.choose.pool.length === 0, 'her search only looks for "Shining Sarcophagus" (none in the Deck, so nothing to add)');
+    // Procedure needs a card to discard
+    const dmgHand = zoneIn(0, 'hand', card('Dark Magician Girl the Magician\'s Apprentice', 'dmgH'));
+    d.players[0].hand = [dmgHand];
+    check(!E.procedure(d, 0, dmgHand).ok, 'her own Special Summon needs a card to discard');
+    d.players[0].hand.push(card('Dark Magician', 'dm2'));
+    check(E.procedure(d, 0, dmgHand).ok, '…and works once you have one');
+    // Yellow Marten's GY effect needs a Lunalight card on the field to return; its search is only when sent to the GY
+    const mart = zoneIn(0, 'gy', card('Lunalight Yellow Marten', 'martG'));
+    const mOpts = E.options(d, 0, mart);
+    check(mOpts[0].ok === true && !mOpts[1].ok, 'Yellow Marten in the GY: its hand/GY effect is listed, its "sent to the GY" search is not usable at will');
+    const mPlan = E.planFor(d, 0, mart, mOpts[0].effect);
+    check(mPlan.steps.length && mPlan.steps[0].choose.pool.length === 0, 'its target must be a "Lunalight" card you control (none here)');
+    // Lightning Storm's condition
+    d.players[0].mz = d.players[0].mz.map(() => null);
+    const lsC = zoneIn(0, 'hand', card('Lightning Storm', 'lsC'));
+    check(E.activationProblem(d, 0, lsC) === '', 'Lightning Storm can be activated with no face-up cards');
+    zoneIn(0, 'mz', card('Dark Magician', 'dmF'));
+    check(/no face-up cards/i.test(E.activationProblem(d, 0, lsC)), 'Lightning Storm can\'t be activated once you control a face-up card');
+    // Mirror Force only when attacked
+    const mf = zoneIn(0, 'st', card('Mirror Force', 'mfC'));
+    check(/attack/i.test(E.activationProblem(d, 0, mf)) && E.activationProblem(d, 0, mf, { attack: { attacker: 'dmF' } }) === '', 'Mirror Force can only be activated when a monster attacks');
+    // Pot of Desires needs 10 cards in the Deck
+    const podC = zoneIn(0, 'hand', card('Pot of Desires', 'podC'));
+    const keep = d.players[0].deck;
+    d.players[0].deck = keep.slice(0, 5);
+    check(/fewer than 10/.test(E.activationProblem(d, 0, podC)), 'Pot of Desires can\'t be activated with fewer than 10 cards in the Deck');
+    d.players[0].deck = keep;
+    // Paying a cost
+    const before = d.players[0].deck.length;
+    E.payCost(d, 0, podC, E.readCosts(pod[0]));
+    check(d.players[0].deck.length === before - 10 && d.players[0].banished.length >= 10, 'paying Pot of Desires\' cost banishes the top 10 cards');
+    // Once per turn per effect
+    E.markUsed(d, 0, mart, marten[0]);
+    check(E.used(d, 0, mart, marten[0]) && !E.used(d, 0, mart, marten[1]), 'once-per-turn is tracked for each effect separately');
+  }
+
   console.log('Claude opponent');
   const calls = [];
   global.fetch = async (url, init) => {

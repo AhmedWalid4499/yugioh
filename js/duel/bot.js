@@ -38,9 +38,19 @@
     return Math.max.apply(null, mons.map((m) => (m.card.faceUp ? (m.card.pos === 'atk' ? duel.atk(m.card) : duel.def(m.card)) : 1500)));
   }
 
-  /* Should the bot use this plan now? */
+  /* Picks the first worthwhile option of an "Activate 1 of these effects" plan. */
+  function pickMode(duel, p, c, pl) {
+    if (!pl || !pl.modes) return pl;
+    return pl.modes.find((m) => worthIt(duel, p, c, m)) || null;
+  }
+
+  /* Should the bot use this plan now? It must be fully understood and its cost payable. */
   function worthIt(duel, p, c, pl) {
     if (!pl) return false;
+    if (pl.modes) return !!pickMode(duel, p, c, pl);
+    if (pl.understood === false || (pl.manual && pl.manual.length > 0)) return false;
+    if (pl.cost && E().costProblem(duel, p, c, pl.cost)) return false;
+    if (pl.steps && pl.steps.some((s) => s.choose && !E().autoChoose(duel, p, { choose: s.choose }).length)) return false;
     if (pl.fusion) return pl.fusion.length > 0;
     if (pl.choose) return pl.choose.pool.length > 0 && E().autoChoose(duel, p, pl).length > 0;
     if (!pl.ops.length) return false;
@@ -59,7 +69,12 @@
   /* Runs a plan for card c, letting the other player respond first. */
   async function resolveWithResponse(duel, p, c, pf, ui, opts) {
     const o = opts || {};
-    duel.markUsed(p, c);
+    if (pf.cost && pf.cost.length) {
+      if (E().costProblem(duel, p, c, pf.cost)) { if (o.spellTrap) duel.finishActivation(c.uid); return false; }
+      E().payCost(duel, p, c, pf.cost);
+      duel.say(duel.pname(p) + ' pays the cost: ' + pf.cost.map((x) => x.label.toLowerCase()).join(', ') + '.', p);
+    }
+    E().markUsed(duel, p, c, pf.effect);
     const resp = await win(ui)({ type: 'activate', player: p, card: c, kind: duel.kind(c), plan: pf, onField: !!o.onField });
     if (resp && resp.negated) {
       duel.say(c.name + '\'s effect is negated' + (resp.by ? ' by ' + resp.by : '') + '.');
@@ -95,10 +110,9 @@
     await win(ui)({ type: 'summon', player: p, card: c, uid: c.uid });
     const loc = duel.find(c.uid);
     if (!loc || (loc.zone !== 'mz' && loc.zone !== 'emz') || !c.faceUp) return;
-    const t = text(c).toLowerCase();
-    const trig = how === 'normal' ? /if this card is normal (or special )?summoned|when this card is normal summoned/ : /if this card is (normal or )?special summoned|if this card is summoned/;
-    if (!trig.test(t) || duel.usedThisTurn(p, c)) return;
-    const pf = E().plan(duel, p, c, { summoned: true });
+    const opt = E().options(duel, p, c, { event: how }).find((x) => x.ok && x.effect.type === 'trigger' && x.effect.event && x.effect.event.indexOf(how) !== -1);
+    if (!opt) return;
+    const pf = pickMode(duel, p, c, E().planFor(duel, p, c, opt.effect));
     if (worthIt(duel, p, c, pf)) {
       duel.say(c.name + '\'s effect activates.', p);
       await resolveWithResponse(duel, p, c, pf, ui, { onField: true });
@@ -115,17 +129,17 @@
       if (field && !pl.field) {
         const r = duel.activateSpellTrap(p, field.uid);
         if (r.ok) {
-          const pf = E().plan(duel, p, field);
+          const pf = pickMode(duel, p, field, E().plan(duel, p, field));
           if (worthIt(duel, p, field, pf)) await resolveWithResponse(duel, p, field, pf, ui, { spellTrap: true });
-          else { duel.markUsed(p, field); duel.finishActivation(field.uid); }
+          else duel.finishActivation(field.uid);
           acted = true;
           await ui.pause();
           continue;
         }
       }
       for (const c of pl.hand.slice()) {
-        if (duel.kind(c) !== 'spell' || /Field|Continuous|Equip/.test(c.data.race || '') || duel.usedThisTurn(p, c)) continue;
-        const pf = E().plan(duel, p, c);
+        if (duel.kind(c) !== 'spell' || /Field|Continuous|Equip/.test(c.data.race || '') || E().activationProblem(duel, p, c)) continue;
+        const pf = pickMode(duel, p, c, E().plan(duel, p, c));
         if (!worthIt(duel, p, c, pf)) continue;
         if (duel.freeSt(p) === -1) break;
         const r = duel.activateSpellTrap(p, c.uid);
@@ -157,6 +171,33 @@
     if (/if you control a tuner/.test(before) && !mine.some((x) => /tuner/i.test(x.data.type))) return false;
     if (/during your opponent's turn|if your opponent|when your opponent/.test(before) && !/controls/.test(before)) return false;
     return true;
+  }
+
+  /* Ignition effects the bot fully understands: e.g. "Once per turn: target 1 monster your opponent controls; destroy it". */
+  async function useEffects(duel, p, ui) {
+    let guard = 0;
+    let acted = true;
+    while (acted && guard++ < 8 && duel.winner == null) {
+      acted = false;
+      const pl = duel.players[p];
+      const cards = duel.monsters(p).map((m) => m.card).filter((c) => c.faceUp && !c.effectsNegated)
+        .concat(duel.spellsTraps(p).map((x) => x.card).filter((c) => c.faceUp))
+        .concat(pl.hand.filter((c) => duel.kind(c) === 'monster'))
+        .concat(pl.gy.filter((c) => duel.kind(c) === 'monster'));
+      for (const c of cards) {
+        const opt = E().options(duel, p, c).find((x) => x.ok && x.effect.type === 'ignition');
+        if (!opt) continue;
+        const pf = pickMode(duel, p, c, E().planFor(duel, p, c, opt.effect));
+        if (!worthIt(duel, p, c, pf)) continue;
+        // Don't throw away good cards: hand/GY effects only when they summon or search.
+        if (duel.find(c.uid).zone !== 'mz' && duel.find(c.uid).zone !== 'emz' && !(pf.steps || []).some((s) => s.choose && (s.choose.op === 'special_summon' || s.choose.op === 'to_hand') || (s.ops || []).some((o) => o.op === 'special_summon' || o.op === 'draw'))) continue;
+        duel.say(duel.pname(p) + ' activates ' + c.name + '\'s effect.', p);
+        duel.fx('activate', { uid: c.uid, player: p, kind: duel.kind(c) });
+        await resolveWithResponse(duel, p, c, pf, ui, { onField: duel.find(c.uid) && duel.find(c.uid).zone === 'mz' });
+        acted = true;
+        break;
+      }
+    }
   }
 
   async function extenders(duel, p, ui) {
@@ -322,8 +363,10 @@
     await extenders(duel, p, ui);
     await normalSummon(duel, p, ui);
     await extenders(duel, p, ui);
+    await useEffects(duel, p, ui);
     await useSpells(duel, p, ui);
     await extraSummons(duel, p, ui);
+    await useEffects(duel, p, ui);
     await flipSummons(duel, p, ui);
     if (duel.winner != null) return;
     if (duel.canEnterBattle()) {
@@ -354,15 +397,18 @@
   async function useResponse(duel, p, c, pf) {
     const loc = duel.find(c.uid);
     if (!loc) return false;
+    if (pf.cost && E().costProblem(duel, p, c, pf.cost)) return false;
     if (duel.kind(c) === 'monster') {
-      duel.sendTo(c.uid, 'gy', false);
-      duel.say(duel.pname(p) + ' activates ' + c.name + ' from the hand!', p);
+      if (pf.cost && pf.cost.length) E().payCost(duel, p, c, pf.cost);
+      else if (loc.zone === 'hand') duel.sendTo(c.uid, 'gy', false);
+      duel.say(duel.pname(p) + ' activates ' + c.name + (loc.zone === 'hand' ? ' from the hand!' : '!'), p);
       duel.fx('activate', { uid: c.uid, player: p, kind: 'monster' });
     } else {
       const r = duel.activateSpellTrap(p, c.uid);
       if (!r.ok) return false;
+      if (pf.cost && pf.cost.length) E().payCost(duel, p, c, pf.cost);
     }
-    duel.markUsed(p, c);
+    E().markUsed(duel, p, c, pf.effect);
     E().run(duel, p, pf, E().autoChoose(duel, p, pf));
     if (duel.kind(c) !== 'monster') duel.finishActivation(c.uid);
     return true;
@@ -373,10 +419,10 @@
     if (!ev || ev.player === p || duel.winner != null) return {};
     const important = ev.plan ? (ev.plan.choose || ev.plan.fusion || (ev.plan.ops && ev.plan.ops.length)) : true;
     if (!important) return {};
-    for (const c of handResponders(duel, p).concat(settableReady(duel, p))) {
-      if (duel.usedThisTurn(p, c)) continue;
+    for (const c of handResponders(duel, p).concat(settableReady(duel, p)).concat(duel.monsters(p).map((m) => m.card).filter((x) => x.faceUp && !x.effectsNegated))) {
       const pf = E().plan(duel, p, c, { activation: ev });
-      if (!pf || !pf.negateActivation) continue;
+      if (!pf || !pf.negateActivation || E().used(duel, p, c, pf.effect)) continue;
+      if (pf.effect && E().options(duel, p, c, { respond: true }).some((x) => x.effect === pf.effect && !x.ok && !/once per turn|response/i.test(x.why) && !/Main Phase/.test(x.why))) continue;
       if (await useResponse(duel, p, c, pf)) return { negated: true, by: c.name };
     }
     return {};
@@ -391,7 +437,7 @@
     if (!worth) return {};
     for (const c of settableReady(duel, p)) {
       const pf = E().plan(duel, p, c, { summon: ev.uid });
-      if (!pf || !pf.ops.length) continue;
+      if (!pf || !pf.ops.length || E().used(duel, p, c, pf.effect) || (pf.cost && E().costProblem(duel, p, c, pf.cost))) continue;
       if (pf.ops.length > 1) { // board wipes: only if it hurts them more than us
         const o = duel.opp(p);
         const theirs = pf.ops.filter((op) => { const l = duel.find(op.card); return l && l.player === o; }).length;
@@ -410,11 +456,13 @@
     if (!attacker) return false;
     for (const c of settableReady(duel, p)) {
       const pf = E().plan(duel, p, c, { attack: pa });
-      if (!pf || (!pf.ops.length && !pf.negateAttack)) continue;
+      if (!pf || (!pf.ops.length && !pf.negateAttack) || E().used(duel, p, c, pf.effect) || (pf.cost && E().costProblem(duel, p, c, pf.cost))) continue;
       const important = duel.atk(attacker.card) >= 1500 || !pa.target || duel.atk(attacker.card) >= duel.players[p].lp;
       if (!important) continue;
       const r = duel.activateSpellTrap(p, c.uid);
       if (!r.ok) continue;
+      if (pf.cost && pf.cost.length) E().payCost(duel, p, c, pf.cost);
+      E().markUsed(duel, p, c, pf.effect);
       E().run(duel, p, pf);
       duel.finishActivation(c.uid);
       return true;
@@ -430,7 +478,7 @@
       const loc = duel.find(uid);
       if (!loc) continue;
       const owner = loc.card.controller != null ? loc.card.controller : loc.card.owner;
-      const pf = E().plan(duel, owner, loc.card, { flip: true, summoned: true });
+      const pf = pickMode(duel, owner, loc.card, E().plan(duel, owner, loc.card, { flip: true }));
       if (pf && worthIt(duel, owner, loc.card, pf)) {
         duel.say(loc.card.name + '\'s FLIP effect activates.', owner);
         E().run(duel, owner, pf, E().autoChoose(duel, owner, pf));

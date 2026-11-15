@@ -79,6 +79,12 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 - **What's automated:** turn and phase order, drawing, Normal and Tribute Summons, Sets, when Spells and Traps can be activated, position changes, battle, damage, LP and win conditions.
 - Common effects resolve with **one click**: draw, destroy, search, revive, burn, Fusion Summons, and Mirror Force-style Traps. Anything else you resolve with the card menus: move cards between zones, Special Summon, change ATK or LP, search the Deck.
 
+### 🃏 Card effects
+- **Rule-based reading:** each card's text is split into its separate effects. Each effect has its own timing, condition, cost and once-per-turn limit, and the zone it works from (hand, field or GY).
+- **Resolving:** only the effect you choose is used. Its costs are paid first, and you pick which cards pay.
+- **Options:** cards that say "activate 1 of these effects" let you choose which.
+- **What the app can't do itself:** the dialog says which part to do with the card menus.
+
 ### 🎮 Duel board
 - **Guided play:**
   - A line under the turn box tells you what you can do next.
