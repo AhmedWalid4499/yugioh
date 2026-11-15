@@ -1,0 +1,17 @@
+Sound effects in this folder are unmodified files from the uisfx library
+(https://github.com/romainsimon/uisfx), redistributed via the npm package
+@wubbleai/community-sfx 0.1.0. They are dedicated to the public domain under CC0 1.0
+(see LICENSE-AUDIO.txt). Files were renamed for their use in Duel Vault:
+  draw.mp3 <- cinematic/swipe.mp3
+  set.mp3 <- cinematic/drop.mp3
+  activate.mp3 <- cinematic/unlock.mp3
+  summon.mp3 <- scifi/level-up.mp3
+  special.mp3 <- cinematic/level-up.mp3
+  phase.mp3 <- cinematic/forward.mp3
+  turn.mp3 <- cinematic/open.mp3
+  click.mp3 <- cinematic/press.mp3
+  win.mp3 <- cinematic/achievement.mp3
+  lose.mp3 <- cinematic/error.mp3
+  invalid.mp3 <- cinematic/invalid-drop.mp3
+  move.mp3 <- cinematic/delete.mp3
+  gain.mp3 <- cinematic/reward.mp3

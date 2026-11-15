@@ -164,7 +164,12 @@
       if (a.type === 'normal_summon' || a.type === 'set_monster') r = duel.normalSummon(p, a.card, a.type === 'set_monster' ? 'set' : 'atk', a.tributes || []);
       else if (a.type === 'set_spell_trap') r = duel.setSpellTrap(p, a.card);
       else if (a.type === 'change_position') r = duel.changePosition(p, a.card);
-      else if (a.type === 'special_summon') r = duel.specialSummon(p, a.card, pos, { materials: a.materials || [], how: 'summoned from the Extra Deck' });
+      else if (a.type === 'special_summon') {
+        const loc = duel.find(a.card);
+        const mats = (a.materials || []).map((u) => duel.find(u)).filter(Boolean).map((x) => x.card);
+        const chk = loc && loc.zone === 'extra' && mats.length ? App.Materials.check(loc.card, mats) : { ok: true };
+        r = !chk.ok ? { ok: false, message: chk.message } : duel.specialSummon(p, a.card, pos, { materials: a.materials || [], how: loc ? App.Materials.summonKind(loc.card) : 'summoned from the Extra Deck' });
+      }
       else if (a.type === 'activate') {
         const loc = duel.find(a.card);
         if (!loc) { problems.push('activate: unknown card ' + a.card); continue; }

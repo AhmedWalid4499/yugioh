@@ -80,6 +80,10 @@
   /* ---------- events & log ---------- */
 
   P.on = function (fn) { this.listeners.push(fn); };
+  /* Effects channel for sounds and animations: fx(type, data). Types: draw, summon,
+     special, set, activate, attack, destroy, damage, gain, phase, turn, win, lose, move. */
+  P.onFx = function (fn) { (this.fxListeners = this.fxListeners || []).push(fn); };
+  P.fx = function (type, data) { (this.fxListeners || []).forEach((fn) => { try { fn(type, data || {}); } catch (e) { console.error(e); } }); };
   P.changed = function () { this.listeners.forEach((fn) => { try { fn(this); } catch (e) { console.error(e); } }); };
   P.say = function (text, who) {
     this.log.push({ turn: this.turn, text: text, who: who == null ? null : who });
@@ -177,6 +181,7 @@
     else if (to === 'deckTop') owner.deck.unshift(c);
     else if (to === 'deckBottom') owner.deck.push(c);
     else if (to === 'deck') { owner.deck.push(c); shuffle(owner.deck); }
+    if (why !== false && (to === 'gy' || to === 'banished')) this.fx('move', { uid: uid, to: to, from: loc.zone, player: c.owner });
     const label = { hand: 'to the hand', gy: 'to the GY', banished: 'banished', extra: 'to the Extra Deck', deckTop: 'to the top of the Deck', deckBottom: 'to the bottom of the Deck', deck: 'shuffled into the Deck' }[to];
     if (why !== false) this.say(c.name + ' ' + (to === 'banished' ? 'is banished' : 'goes ' + label) + (why ? ' (' + why + ')' : '') + '.');
     return true;
@@ -186,6 +191,7 @@
     const loc = this.find(uid);
     if (!loc) return false;
     this.say(loc.card.name + ' is destroyed' + (why ? ' by ' + why : '') + '.');
+    this.fx('destroy', { uid: uid, player: loc.player });
     return this.sendTo(uid, 'gy', false);
   };
 
@@ -224,6 +230,7 @@
     this.monsters(p).forEach((m) => { m.card.attacked = false; m.card.posChanged = false; });
     this.phase = 'draw';
     this.say('— Turn ' + this.turn + ': ' + pl.name + ' —');
+    this.fx('turn', { player: p, turn: this.turn, name: pl.name });
     const skipDraw = this.turn === 1 && !this.format.firstPlayerDraws;
     if (!skipDraw) this.draw(p, 1);
     if (this.winner == null) this.phase = 'main1';
@@ -240,6 +247,7 @@
     else if (this.phase === 'end') { this.endTurn(); return; }
     else this.phase = 'main1';
     this.say(this.pname(this.active) + ' ' + this.v(this.active, 'enters', 'enter') + ' the ' + PHASE_LABEL[this.phase] + '.');
+    this.fx('phase', { phase: this.phase, label: PHASE_LABEL[this.phase], player: this.active });
     this.changed();
   };
 
@@ -268,7 +276,7 @@
       pl.hand.push(pl.deck.shift());
       drawn++;
     }
-    if (!silent) this.say(pl.name + ' ' + this.v(p, 'draws', 'draw') + ' ' + (drawn === 1 ? 'a card' : drawn + ' cards') + '.', p);
+    if (!silent) { this.say(pl.name + ' ' + this.v(p, 'draws', 'draw') + ' ' + (drawn === 1 ? 'a card' : drawn + ' cards') + '.', p); this.fx('draw', { player: p, count: drawn }); }
     return drawn;
   };
 
@@ -276,12 +284,15 @@
     if (this.winner != null) return;
     this.winner = this.opp(p);
     this.say('🏆 ' + this.pname(this.winner) + ' ' + this.v(this.winner, 'wins', 'win') + '! (' + why + ')');
+    this.fx(this.winner === 0 ? 'win' : 'lose', { winner: this.winner });
     this.changed();
   };
 
   P.changeLp = function (p, delta, why) {
     const pl = this.players[p];
+    const before = pl.lp;
     pl.lp = Math.max(0, pl.lp + delta);
+    this.fx(delta < 0 ? 'damage' : 'gain', { player: p, amount: Math.abs(delta), from: before, to: pl.lp });
     this.say(pl.name + (delta < 0 ? ' ' + this.v(p, 'takes', 'take') + ' ' + (-delta) + ' damage' : ' ' + this.v(p, 'gains', 'gain') + ' ' + delta + ' LP') + (why ? ' (' + why + ')' : '') + '. LP: ' + pl.lp + '.', p);
     if (pl.lp <= 0) this.lose(p, pl.name + '\'s LP reached 0');
   };
@@ -300,7 +311,7 @@
   };
 
   /* Normal Summon (pos 'atk') or Set (pos 'set') a monster from the hand. */
-  P.normalSummon = function (p, uid, pos, tributes) {
+  P.normalSummon = function (p, uid, pos, tributes, zone) {
     if (this.winner != null) return fail('The duel is over.');
     if (p !== this.active || !this.isMain()) return fail('You can only Normal Summon in your own Main Phase.');
     const pl = this.players[p];
@@ -312,9 +323,11 @@
     const trib = (tributes || []).filter((t) => this.monsters(p).some((m) => m.card.uid === t)).slice(0, need);
     if (trib.length < need) return fail(c.name + ' needs ' + need + ' Tribute' + (need > 1 ? 's' : '') + '.');
     trib.forEach((t) => this.sendTo(t, 'gy', 'Tribute'));
-    const res = this.placeMonster(p, uid, { pos: pos === 'set' ? 'set' : 'atk' });
+    if (zone && zone.mz != null && pl.mz[zone.mz] && trib.indexOf(pl.mz[zone.mz].uid) === -1) zone = null;
+    const res = this.placeMonster(p, uid, { pos: pos === 'set' ? 'set' : 'atk', zone: zone && zone.mz != null && !pl.mz[zone.mz] ? zone : null });
     if (!res.ok) return res;
     pl.normalSummoned = true;
+    this.fx(pos === 'set' ? 'set' : 'summon', { uid: uid, player: p, tribute: need > 0 });
     this.say(pl.name + (pos === 'set' ? ' ' + this.v(p, 'Sets', 'Set') + ' a monster.' : (need ? ' ' + this.v(p, 'Tribute Summons', 'Tribute Summon') + ' ' : ' ' + this.v(p, 'Normal Summons', 'Normal Summon') + ' ') + c.name + ' (' + this.atk(c) + ' ATK).'), p);
     this.changed();
     return { ok: true };
@@ -339,13 +352,14 @@
       return res;
     }
     if (isXyz) res.card.materials = mats;
+    this.fx('special', { uid: res.card.uid, player: p, how: o.how || '', extra: this.isExtra(res.card) });
     this.say(this.pname(p) + ' ' + this.v(p, 'Special Summons', 'Special Summon') + ' ' + res.card.name + (o.how ? ' (' + o.how + ')' : '') + (pos === 'set' ? ' face-down' : '') + '.', p);
     this.changed();
     return { ok: true };
   };
 
   /* Set a Spell/Trap from the hand. */
-  P.setSpellTrap = function (p, uid) {
+  P.setSpellTrap = function (p, uid, zoneIndex) {
     if (p !== this.active || !this.isMain()) return fail('You can only Set Spells/Traps in your own Main Phase.');
     const pl = this.players[p];
     const c = pl.hand.find((x) => x.uid === uid);
@@ -356,13 +370,14 @@
       this.remove(uid);
       pl.field = c;
     } else {
-      const z = this.freeSt(p);
+      const z = zoneIndex != null && !pl.st[zoneIndex] ? zoneIndex : this.freeSt(p);
       if (z === -1) return fail('Your Spell & Trap Zones are full.');
       this.remove(uid);
       pl.st[z] = c;
     }
     c.faceUp = false;
     c.setTurn = this.turn;
+    this.fx('set', { uid: uid, player: p, spellTrap: true });
     this.say(pl.name + ' ' + this.v(p, 'Sets', 'Set') + ' a card.', p);
     this.changed();
     return { ok: true };
@@ -376,7 +391,7 @@
 
   /* Activate a Spell/Trap (from hand or Set). Places it face-up and returns it;
      call finishActivation() after the effect resolves. */
-  P.activateSpellTrap = function (p, uid) {
+  P.activateSpellTrap = function (p, uid, zoneIndex) {
     if (this.winner != null) return fail('The duel is over.');
     const loc = this.find(uid);
     if (!loc || loc.player !== p) return fail('That card is not yours.');
@@ -400,13 +415,14 @@
         this.remove(uid);
         pl.field = c;
       } else {
-        const z = this.freeSt(p);
+        const z = zoneIndex != null && !pl.st[zoneIndex] ? zoneIndex : this.freeSt(p);
         if (z === -1) return fail('Your Spell & Trap Zones are full.');
         this.remove(uid);
         pl.st[z] = c;
       }
     }
     c.faceUp = true;
+    this.fx('activate', { uid: uid, player: p, kind: kind });
     this.say(this.pname(p) + ' ' + this.v(p, 'activates', 'activate') + ' ' + c.name + '.', p);
     this.changed();
     return { ok: true, card: c };
@@ -457,6 +473,7 @@
     chk.card.attacked = true;
     const target = targetUid ? this.find(targetUid).card : null;
     this.pendingAttack = { attacker: uid, target: targetUid || null, player: p };
+    this.fx('attack', { attacker: uid, target: targetUid || null, player: p });
     this.say(chk.card.name + ' attacks ' + (target ? (target.faceUp ? target.name : 'a face-down monster') : this.pname(o) + ' directly') + '!', p);
     this.changed();
     return { ok: true, pending: this.pendingAttack };

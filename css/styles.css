@@ -432,7 +432,8 @@ label.check input { margin-top: 3px; }
 .duel-page { max-width: none; }
 .duel { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
 .board {
-  --slot-w: clamp(46px, min(7.2vw, 8vh), 92px);
+  /* Card size follows the window: about 6.6 card-heights of rows must fit under the header. */
+  --slot-w: clamp(44px, min(7vw, calc((100vh - 300px) / 6.8 * .686)), 92px);
   background: radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 7%, var(--surface)) 0%, var(--surface) 70%);
   border: 1px solid var(--border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px;
 }
@@ -519,3 +520,136 @@ label.check input { margin-top: 3px; }
 .char-name { font-weight: 700; font-size: .86rem; line-height: 1.2; }
 .char-sub { font-size: .72rem; color: var(--muted); }
 @media (max-width: 600px) { .char-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); } }
+
+/* =====================================================================
+   Duel board v2 — playmat, fonts, interactions and animations
+   Fonts: Cinzel & Rajdhani (SIL OFL, vendor/fonts)
+   ===================================================================== */
+
+@font-face { font-family: 'Cinzel'; font-weight: 700; font-display: swap; src: url('../vendor/fonts/cinzel-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Rajdhani'; font-weight: 600; font-display: swap; src: url('../vendor/fonts/rajdhani-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Rajdhani'; font-weight: 700; font-display: swap; src: url('../vendor/fonts/rajdhani-latin-700-normal.woff2') format('woff2'); }
+
+.duel-page { --mat-glow: #3fb6ff; --mat-glow-2: #b46cff; --mat-gold: #e3b341; }
+.duel-page .board {
+  position: relative;
+  color: #e8eefc;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 50%, rgba(63, 182, 255, .18), transparent 70%),
+    radial-gradient(ellipse 90% 60% at 50% 100%, rgba(180, 108, 255, .16), transparent 70%),
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255, 90, 90, .12), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 0l14 8v16L14 32 0 24V8zM42 16l14 8v16l-14 8-14-8V24z' fill='none' stroke='%233fb6ff' stroke-opacity='.07'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #0b1020 0%, #121a33 50%, #0b1020 100%);
+  border: 1px solid rgba(63, 182, 255, .35);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, .6), 0 10px 40px rgba(0, 0, 0, .35);
+}
+.duel-page .board::after { /* centre line */
+  content: ''; position: absolute; left: 8%; right: 8%; top: 50%; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(227, 179, 65, .55), transparent);
+}
+.duel-page .pinfo { background: rgba(10, 16, 34, .72); border-color: rgba(63, 182, 255, .3); color: #e8eefc; backdrop-filter: blur(6px); }
+.duel-page .pinfo .muted { color: #9fb0d0; }
+.duel-page .pinfo.active { border-color: var(--mat-gold); box-shadow: 0 0 0 1px var(--mat-gold), 0 0 22px rgba(227, 179, 65, .35); }
+.duel-page .pname strong { font-family: 'Cinzel', serif; letter-spacing: .03em; }
+.lp-box { display: flex; flex-direction: column; gap: 4px; min-width: 120px; border-radius: 8px; padding: 2px 6px; }
+.duel-page .lp { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 2rem; color: var(--mat-gold); text-shadow: 0 0 12px rgba(227, 179, 65, .45); transition: color .3s; }
+.duel-page .lp.low { color: #ff6b6b; text-shadow: 0 0 12px rgba(255, 80, 80, .6); animation: pulse-red 1.4s ease-in-out infinite; }
+@keyframes pulse-red { 50% { opacity: .65; } }
+.lp-bar { height: 6px; background: rgba(255, 255, 255, .1); border-radius: 999px; overflow: hidden; }
+.lp-bar span { display: block; height: 100%; background: linear-gradient(90deg, #ff5f5f, #e3b341 45%, #5fdc8a); border-radius: inherit; transition: width .6s ease; }
+.duel-page .pile { background: rgba(255, 255, 255, .06); border-color: rgba(63, 182, 255, .3); color: #dbe6ff; font-family: 'Rajdhani', sans-serif; font-weight: 600; }
+.duel-page .pile b { color: var(--mat-gold); margin-left: 2px; }
+.duel-page .pile-gy::before { content: '🪦 '; }
+.duel-page .pile-banished::before { content: '✶ '; }
+.duel-page .pile-extra::before { content: '⬡ '; }
+.duel-page .pile-deck::before { content: '▤ '; }
+
+/* Zones */
+.duel-page .slot.empty { border: 1px solid rgba(63, 182, 255, .35); background: radial-gradient(circle at 50% 50%, rgba(63, 182, 255, .12), rgba(10, 16, 34, .35) 70%); box-shadow: inset 0 0 12px rgba(63, 182, 255, .15); }
+.duel-page .slot.empty span { color: rgba(200, 220, 255, .55); font-family: 'Rajdhani', sans-serif; font-weight: 600; }
+.duel-page .slot.empty::before { content: ''; position: absolute; inset: 22% 18%; border-radius: 50%; border: 1px solid rgba(63, 182, 255, .18); }
+.duel-page .slot.zone-st, .duel-page .zones.st .slot.empty { border-color: rgba(64, 214, 170, .35); background: radial-gradient(circle, rgba(64, 214, 170, .1), rgba(10, 16, 34, .35) 70%); }
+.duel-page .slot.zone-field { border-color: rgba(227, 179, 65, .45); }
+.duel-page .slot.zone-emz { border-color: rgba(180, 108, 255, .5); background: radial-gradient(circle, rgba(180, 108, 255, .16), rgba(10, 16, 34, .35) 70%); }
+.duel-page .zones.emz { border-color: rgba(180, 108, 255, .25); }
+.duel-page .card-slot { background: #0b1020; box-shadow: 0 4px 12px rgba(0, 0, 0, .5); }
+.duel-page .card-slot .stats { font-family: 'Rajdhani', sans-serif; font-size: .7rem; background: rgba(5, 8, 18, .9); border: 1px solid rgba(227, 179, 65, .5); }
+
+/* Hand: slight fan, cards rise on hover */
+.hand-card-wrap { transform: rotate(var(--tilt, 0deg)); transform-origin: 50% 120%; transition: transform .15s; }
+.hand-row.mine .hand-card-wrap:hover { transform: rotate(0deg) translateY(-14px) scale(1.08); z-index: 3; }
+.hand-row.mine .hand-card-wrap .card-slot:hover { transform: none; }
+.hand-row.theirs .hand-card-wrap .slot { width: calc(var(--slot-w) * .7); }
+
+/* Hints: what you can play right now */
+.card-slot.playable { border-color: #5fdc8a; box-shadow: 0 0 0 1px #5fdc8a, 0 0 16px rgba(95, 220, 138, .55); animation: hint-glow 1.6s ease-in-out infinite; }
+.card-slot.settable { border-color: #40d6aa; box-shadow: 0 0 10px rgba(64, 214, 170, .4); }
+.card-slot.ready { border-color: #ff7b54; box-shadow: 0 0 0 1px #ff7b54, 0 0 18px rgba(255, 123, 84, .6); animation: hint-glow 1.2s ease-in-out infinite; }
+@keyframes hint-glow { 50% { box-shadow: 0 0 0 1px currentColor, 0 0 4px rgba(255, 255, 255, .15); } }
+.card-slot[draggable="true"] { cursor: grab; }
+.card-slot[draggable="true"]:active { cursor: grabbing; }
+
+/* Drag & drop targets */
+#duel-root.dragging [data-drop] { outline: 2px dashed rgba(227, 179, 65, .55); outline-offset: 2px; }
+#duel-root.dragging .slot.empty[data-drop] { box-shadow: inset 0 0 18px rgba(227, 179, 65, .35); }
+#duel-root.drag-attack .card-slot.theirs.target, #duel-root.drag-attack [data-drop="opp-lp"] { outline: 2px solid #ff7b54; outline-offset: 2px; box-shadow: 0 0 22px rgba(255, 123, 84, .7); }
+#duel-root .drop-hover { outline: 3px solid var(--accent) !important; box-shadow: 0 0 26px rgba(227, 179, 65, .8) !important; }
+
+/* Card preview (Master-Duel style) */
+.preview { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: grid; grid-template-columns: 110px 1fr; gap: 10px; min-height: 120px; }
+.preview-card img, .preview-card .cardback { width: 100%; border-radius: 6px; display: block; aspect-ratio: 421 / 614; position: relative; }
+.preview-info { font-size: .82rem; min-width: 0; }
+.preview-info strong { font-family: 'Cinzel', serif; font-size: .9rem; display: block; margin-bottom: 2px; }
+.preview-text { margin-top: 6px; max-height: 170px; overflow-y: auto; font-size: .78rem; line-height: 1.4; }
+.preview-empty { grid-column: 1 / -1; display: grid; place-items: center; }
+.sound-box { display: flex; align-items: center; gap: 8px; }
+.sound-box input[type=range] { flex: 1; accent-color: var(--accent); }
+.tip { margin: 0; }
+
+/* Animations */
+.fx-summon { animation: fx-summon .6s cubic-bezier(.2, .8, .3, 1.2); }
+@keyframes fx-summon { 0% { transform: scale(1.6) translateY(-20px); opacity: 0; filter: brightness(2.5); } 60% { opacity: 1; } 100% { filter: none; } }
+.card-slot.def.fx-summon { animation-name: fx-summon-def; }
+@keyframes fx-summon-def { 0% { transform: rotate(90deg) scale(1.4); opacity: 0; filter: brightness(2.5); } 100% { transform: rotate(90deg) scale(.82); opacity: 1; } }
+.fx-special { animation: fx-special .9s ease-out; }
+@keyframes fx-special {
+  0% { transform: scale(2) rotate(-8deg); opacity: 0; filter: brightness(3) saturate(2); box-shadow: 0 0 0 0 rgba(180, 108, 255, .9); }
+  50% { opacity: 1; box-shadow: 0 0 40px 18px rgba(180, 108, 255, .7); }
+  100% { transform: none; filter: none; box-shadow: 0 0 0 0 rgba(180, 108, 255, 0); }
+}
+.card-slot.def.fx-special { animation-name: fx-summon-def; }
+.fx-set { animation: fx-set .45s ease-out; }
+@keyframes fx-set { 0% { transform: translateY(-30px) rotateY(90deg); opacity: 0; } 100% { opacity: 1; } }
+.fx-activate { animation: fx-activate .8s ease-out; }
+@keyframes fx-activate { 0% { box-shadow: 0 0 0 0 rgba(64, 214, 170, .9); filter: brightness(2); } 60% { box-shadow: 0 0 30px 12px rgba(64, 214, 170, .55); } 100% { box-shadow: none; filter: none; } }
+.fx-draw { animation: fx-draw .5s ease-out; }
+@keyframes fx-draw { 0% { transform: translate(140px, -40px) rotate(18deg) scale(.6); opacity: 0; } 100% { opacity: 1; } }
+.fx-hit { animation: fx-hit .4s ease-out; }
+@keyframes fx-hit { 0%, 100% { filter: none; } 30% { filter: brightness(3) saturate(0); transform: translateX(-4px); } 60% { transform: translateX(4px); } }
+.ghost { pointer-events: none; z-index: 70; }
+.fx-destroy { animation: fx-destroy .85s ease-in forwards; }
+@keyframes fx-destroy { 0% { filter: brightness(2.5); } 30% { transform: scale(1.12) rotate(3deg); filter: brightness(3) hue-rotate(-40deg); } 100% { transform: scale(.4) rotate(-18deg) translateY(30px); opacity: 0; filter: blur(4px) brightness(3); } }
+.fx-banish { animation: fx-banish .8s ease-in forwards; }
+@keyframes fx-banish { 100% { transform: scale(.2) rotate(180deg); opacity: 0; filter: hue-rotate(180deg) brightness(3) blur(3px); } }
+.fx-fade { animation: fx-fade .6s ease-in forwards; }
+@keyframes fx-fade { 100% { transform: translateY(20px) scale(.8); opacity: 0; } }
+.fx-shake { animation: fx-shake .45s ease-in-out; }
+@keyframes fx-shake { 20% { transform: translate(-6px, 3px); } 40% { transform: translate(6px, -3px); } 60% { transform: translate(-4px, 2px); } 80% { transform: translate(3px, -1px); } }
+.float-num { position: absolute; z-index: 80; pointer-events: none; transform: translateX(-50%); font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 2rem; animation: float-num 1.3s ease-out forwards; text-shadow: 0 2px 8px rgba(0, 0, 0, .6); }
+.float-num.dmg { color: #ff5f5f; }
+.float-num.heal { color: #5fdc8a; }
+@keyframes float-num { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.8); } 20% { opacity: 1; transform: translate(-50%, -10px) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -60px) scale(1); } }
+.duel-banner {
+  position: fixed; left: 50%; top: 42%; z-index: 90; pointer-events: none; transform: translate(-50%, -50%);
+  font-family: 'Cinzel', serif; font-weight: 700; font-size: clamp(1.6rem, 5vw, 3.2rem); letter-spacing: .08em; white-space: nowrap;
+  padding: 10px 48px; color: #fff; background: linear-gradient(90deg, transparent, rgba(10, 16, 34, .85) 20%, rgba(10, 16, 34, .85) 80%, transparent);
+  text-shadow: 0 0 18px rgba(63, 182, 255, .9); animation: banner 1.5s ease-out forwards;
+}
+.duel-banner.battle { text-shadow: 0 0 18px rgba(255, 90, 90, .95); }
+.duel-banner.summon { text-shadow: 0 0 18px rgba(180, 108, 255, .95); }
+.duel-banner.win { color: var(--accent); text-shadow: 0 0 24px rgba(227, 179, 65, .95); }
+.duel-banner.lose { color: #ff8080; }
+@keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scaleX(.2); } 15% { opacity: 1; transform: translate(-50%, -50%) scaleX(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%); } }
+@media (prefers-reduced-motion: reduce) {
+  .fx-summon, .fx-special, .fx-set, .fx-activate, .fx-draw, .fx-hit, .fx-shake, .card-slot.playable, .card-slot.ready { animation: none !important; }
+}

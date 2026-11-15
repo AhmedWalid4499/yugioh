@@ -11,11 +11,12 @@ const ROOT = path.resolve(__dirname, '..');
 global.window = global;
 global.localStorage = { _d: {}, getItem(k) { return this._d[k] == null ? null : this._d[k]; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
 global.document = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
-['js/util.js', 'js/formats.js', 'js/api.js', 'js/insights.js', 'js/decks.js', 'js/deckgen.js', 'js/characters.js', 'js/duel/engine.js', 'js/duel/effects.js', 'js/duel/bot.js', 'js/duel/claude.js']
+['js/util.js', 'js/formats.js', 'js/api.js', 'js/insights.js', 'js/decks.js', 'js/deckgen.js', 'js/characters.js', 'js/duel/engine.js', 'js/duel/materials.js', 'js/duel/effects.js', 'js/duel/bot.js', 'js/duel/claude.js']
   .forEach((f) => vm.runInThisContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }));
 const App = global.App;
 const { cards } = require('./fixtures');
 const byName = (n) => cards.find((c) => c.name === n);
+const byNameCard = (n) => ({ uid: 'u' + n, name: n, data: byName(n) });
 
 let failures = 0;
 function check(cond, msg) {
@@ -78,6 +79,38 @@ function giveHand(d, p, names) {
   check(mixed.main.includes(byName('Snake-Eye Ash').id) && mixed.main.includes(byName('Lunalight Yellow Marten').id) && mixed.main.includes(byName('Gemini Elf').id), 'multi-archetype decks mix both pools and include signature cards from outside them');
   check(App.characters.list().length >= 15 && App.characters.list().every((c) => c.archetypes.length && c.signature.indexOf(c.ace) !== -1 || c.signature.length), 'every character has archetypes and signature cards');
   Object.assign(App.api, realApi);
+
+  console.log('Summoning materials');
+  const M = App.Materials;
+  const mk = (o) => ({ uid: 'm' + Math.random(), name: o.name || 'Card', data: Object.assign({ type: 'Effect Monster', level: 4, race: 'Warrior', attribute: 'DARK', desc: '' }, o) });
+  const stardust = mk({ name: 'Stardust Dragon', type: 'Synchro Monster', level: 8, desc: '1 Tuner + 1+ non-Tuner monsters\nWhen a card...' });
+  const junkSyn = mk({ name: 'Junk Synchron', type: 'Tuner Monster', level: 3 });
+  const lv5 = mk({ name: 'Lv5 guy', level: 5 });
+  const lv4 = mk({ name: 'Lv4 guy', level: 4 });
+  check(M.check(stardust, [junkSyn, lv5]).ok, 'Synchro: Tuner (3) + non-Tuner (5) makes Level 8');
+  check(/add up to 7/.test(M.check(stardust, [junkSyn, lv4]).message), 'Synchro: wrong Level total is rejected with the reason');
+  check(/Tuner/.test(M.check(stardust, [lv4, lv4]).message), 'Synchro: no Tuner is rejected');
+  const junkWarrior = mk({ name: 'Junk Warrior', type: 'Synchro Monster', level: 5, desc: '"Junk Synchron" + 1+ non-Tuner monsters' });
+  const otherTuner = mk({ name: 'Other Tuner', type: 'Tuner Monster', level: 1 });
+  check(M.check(junkWarrior, [junkSyn, mk({ level: 2 })]).ok && !M.check(junkWarrior, [otherTuner, lv4]).ok, 'Synchro: a named Tuner ("Junk Synchron") is required');
+  const utopia = mk({ name: 'Number 39: Utopia', type: 'XYZ Monster', level: 4, desc: '2 Level 4 monsters\nWhen a monster declares an attack...' });
+  check(M.check(utopia, [lv4, lv4]).ok, 'Xyz: two Level 4 monsters make Utopia');
+  check(!M.check(utopia, [lv4, lv5]).ok && !M.check(utopia, [lv4]).ok && !M.check(utopia, [lv4, lv4, lv4]).ok, 'Xyz: wrong Level or wrong count is rejected');
+  const decode = mk({ name: 'Decode Talker', type: 'Link Monster', linkval: 3, level: undefined, desc: '2+ Effect Monsters\nGains 500 ATK...' });
+  const link2 = mk({ name: 'Link 2', type: 'Link Monster', linkval: 2, level: undefined });
+  check(M.check(decode, [lv4, lv4, lv5]).ok && M.check(decode, [link2, lv4]).ok, 'Link: 3 monsters, or a Link-2 + 1 monster, make Link-3');
+  check(!M.check(decode, [lv4, lv4]).ok && !M.check(decode, [mk({ type: 'Normal Monster' }), lv4, lv4]).ok, 'Link: too few materials or a non-Effect material is rejected');
+  const flame = mk({ name: 'Elemental HERO Flame Wingman', type: 'Fusion Monster', level: 6, desc: '"Elemental HERO Avian" + "Elemental HERO Burstinatrix"\nMust be Fusion Summoned.' });
+  const avian = mk({ name: 'Elemental HERO Avian' });
+  const burst = mk({ name: 'Elemental HERO Burstinatrix' });
+  check(M.check(flame, [avian, burst]).ok && !M.check(flame, [avian, lv4]).ok, 'Fusion: the named materials are required');
+  check(M.check(byNameCard('Lunalight Cat Dancer'), [mk({ name: 'Lunalight A', archetype: 'Lunalight' }), mk({ name: 'Lunalight B', archetype: 'Lunalight' })]).ok, 'Fusion: 2 "Lunalight" monsters make Cat Dancer');
+
+  console.log('Sound files');
+  const soundSrc = fs.readFileSync(path.join(ROOT, 'js/sound.js'), 'utf8');
+  const names = JSON.parse(/const SAMPLES = (\[[^\]]+\])/.exec(soundSrc)[1].replace(/'/g, '"'));
+  check(names.every((n) => fs.existsSync(path.join(ROOT, 'vendor/sfx', n + '.mp3'))), 'every sound effect file exists (' + names.length + ')');
+  check(fs.existsSync(path.join(ROOT, 'vendor/zzfx/ZzFXMicro.min.js')) && fs.existsSync(path.join(ROOT, 'vendor/sfx/LICENSE-AUDIO.txt')) && fs.existsSync(path.join(ROOT, 'vendor/fonts/OFL-Cinzel.txt')), 'sound library, fonts and their licences are bundled');
 
   console.log('Turn structure');
   let d = newDuel([], []);
