@@ -68,6 +68,8 @@
               '<div class="muted small">Edited ' + esc(new Date(d.updated).toLocaleDateString()) + '</div>' +
               '<div class="row">' +
                 '<a class="btn btn-small btn-primary" href="#/deck/' + esc(d.id) + '">Edit</a>' +
+                '<a class="btn btn-small" href="#/test/' + esc(d.id) + '">🎴 Test hands</a>' +
+                '<a class="btn btn-small" href="#/duel?deck=' + esc(d.id) + '">⚔ Duel</a>' +
                 '<button type="button" class="btn btn-small" data-dup="' + esc(d.id) + '">Duplicate</button>' +
                 '<button type="button" class="btn btn-small" data-export="' + esc(d.id) + '">.ydk</button>' +
                 '<button type="button" class="btn btn-small" data-excel="' + esc(d.id) + '">Excel</button>' +
@@ -75,13 +77,15 @@
               '</div>' +
             '</div></div>';
         }).join('') + '</div>'
-        : '<div class="panel empty-hero"><h2>No decks yet</h2><p>Create a deck, import a .ydk file, or open any card and press “Start a deck with this card”.</p></div>') +
+        : '<div class="panel empty-hero"><h2>No decks yet</h2><p>The quickest way to start: let the app build one for you.</p>' +
+          '<div class="row center"><a class="btn btn-primary" href="#/build">⚡ Auto-build a deck</a><button type="button" class="btn" data-new-empty>+ Start an empty deck</button></div>' +
+          '<p class="muted small">You can also import an Excel, CSV or .ydk file, or open any card in Card Search and press “Start a deck with this card”.</p></div>') +
     '</section>';
 
-    U.$('#new-deck', view).addEventListener('click', () => {
+    U.$$('#new-deck, [data-new-empty]', view).forEach((b) => b.addEventListener('click', () => {
       const deck = D.create('New Deck');
       location.hash = '#/deck/' + deck.id + '?new=1';
-    });
+    }));
     U.$('#import-toggle', view).addEventListener('click', () => {
       const p = U.$('#import-panel', view);
       p.hidden = !p.hidden;

@@ -86,8 +86,20 @@ function apiResponse(url) {
 
   const shot = async (name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png'), fullPage: false }); };
 
-  console.log('Search');
+  console.log('Home');
   await page.goto(URL_BASE);
+  await page.waitForSelector('.home-tile');
+  check((await page.locator('.home-tile').count()) === 4 && (await page.locator('[data-nav="home"].active').count()) === 1, 'the app opens on the Home page with its 4 shortcuts');
+  check((await page.locator('.first-steps').count()) === 1, 'first-time visitors see the 3-step guide');
+  await page.fill('.hero-search input', 'dark magician');
+  await page.press('.hero-search input', 'Enter');
+  await page.waitForFunction(() => location.hash.indexOf('#/search?q=dark') === 0);
+  check(true, 'searching from Home opens Card Search with the query');
+  await page.goto(URL_BASE + '#/help');
+  check((await page.locator('.glossary dt').count()) >= 10 && (await page.locator('#help-duel .help-steps').count()) === 1, 'Help page explains duels and Yu-Gi-Oh! words');
+
+  console.log('Search');
+  await page.goto(URL_BASE + '#/search');
   await page.waitForSelector('.card-tile');
   check((await page.locator('#view .card-tile').count()) === cards.length, 'landing page lists newest cards');
   await shot('01-search');
@@ -253,11 +265,19 @@ function apiResponse(url) {
   await page.click('a:has-text("Duel with this deck")');
   await page.waitForSelector('#duel-form');
   await page.selectOption('#duel-form [name=theirs]', '__mirror');
+  await page.evaluate(() => { document.querySelector('.more-options').open = true; });
   await page.selectOption('#duel-form [name=first]', 'me');
   await page.check('#duel-form [name=ai][value=bot]');
   await page.click('#duel-form button[type=submit]');
   await page.waitForSelector('.board');
   check((await page.locator('.hand-row.mine .card-slot').count()) === 5 && (await page.locator('.hand-row.theirs .hand-back').count()) === 5, 'both players start with 5 cards; the opponent\'s hand is hidden');
+  check(/Main Phase/.test(await page.locator('#duel-guide').innerText()), 'the board tells you what to do next');
+  const bigUid = await page.evaluate(() => { const d = App.duelSession().duel; const c = d.players[0].hand.find((x) => d.kind(x) === 'monster' && d.tributesNeeded(x) > d.monsters(0).length); return c ? c.uid : null; });
+  if (bigUid) {
+    await page.click('[data-uid="' + bigUid + '"]');
+    check(await page.locator('.menu-actions button:has-text("Tribute Summon")').first().isDisabled() && /Needs \d Tribute/.test(await page.locator('.why').innerText()), 'a monster that needs Tributes shows why it can\'t be summoned yet');
+    await page.keyboard.press('Escape');
+  }
   const toSummon = await page.evaluate(() => { const d = App.duelSession().duel; const c = d.players[0].hand.find((x) => d.kind(x) === 'monster' && !d.isExtra(x) && d.tributesNeeded(x) === 0); return c ? c.uid : null; });
   if (toSummon) {
     await page.click('[data-uid="' + toSummon + '"]');
@@ -331,6 +351,7 @@ function apiResponse(url) {
   check((await page.locator('.char-tile').count()) >= 15, 'the duel screen offers famous duelists to pick');
   await page.click('.char-tile[data-char="yugi"]');
   check((await page.inputValue('#duel-form [name=theirs]')) === '__char:yugi', 'clicking Yugi selects him as the opponent');
+  await page.evaluate(() => { document.querySelector('.more-options').open = true; });
   await page.selectOption('#duel-form [name=first]', 'opp');
   await page.check('#duel-form [name=ai][value=bot]');
   await page.click('#duel-form button[type=submit]');
@@ -347,6 +368,7 @@ function apiResponse(url) {
   await page.goto(URL_BASE + '#/duel');
   await page.waitForSelector('#duel-form');
   await page.selectOption('#duel-form [name=theirs]', '__mirror');
+  await page.evaluate(() => { document.querySelector('.more-options').open = true; });
   await page.selectOption('#duel-form [name=first]', 'opp');
   await page.check('#duel-form [name=ai][value=claude]');
   await page.fill('#duel-form [name=key]', 'sk-ant-test');

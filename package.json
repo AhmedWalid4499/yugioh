@@ -1,7 +1,7 @@
 {
   "name": "duel-vault",
   "productName": "Duel Vault",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "description": "Personal Yu-Gi-Oh! card database, deck builder and new-release tracker",
   "author": "Duel Vault",

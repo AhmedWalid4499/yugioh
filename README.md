@@ -4,6 +4,10 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 
 ## What it does
 
+### 🏠 Home and Help
+- **Home** is the first page you see. It has a card search box, one-click shortcuts to every part of the app, your latest decks, a link back to an unfinished duel, and a quick-duel row of famous duelists. First-time visitors also see a 3-step guide.
+- **❓ Help** explains every page and how to duel, lists common Yu-Gi-Oh! words, and answers frequent questions. On the duel board, press **?** to open the same guide.
+
 ### 🔍 Card Search
 - Search every card by name, with filters for card type, sub-type, attribute, level/rank, archetype and banlist status.
 - Open any card to see:
@@ -69,6 +73,12 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 - Common effects resolve with **one click**: draw, destroy, search, revive, burn, Fusion Summons, and Mirror Force-style Traps. Anything else you resolve with the card menus: move cards between zones, Special Summon, change ATK or LP, search the Deck.
 
 ### 🎮 Duel board
+- **Guided play:**
+  - A line under the turn box tells you what you can do next.
+  - Card menus show only the moves the rules allow right now, and greyed-out buttons explain why.
+  - Free moves for effects the app doesn't automate are under *More moves*.
+- **Keyboard shortcuts:** **B** Battle Phase, **M** Main Phase 2, **E** End Turn, **?** How to play.
+- **No deck needed:** on the setup screen you can borrow any famous duelist's deck as your own.
 - **Drag and drop:**
   - Drag a card from your hand onto a Monster Zone to summon or set it.
   - Drag a Spell or Trap onto a Spell & Trap Zone to activate or set it.

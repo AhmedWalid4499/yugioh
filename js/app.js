@@ -14,6 +14,8 @@
   };
 
   const ROUTES = [
+    [/^\/home$/, (v) => App.views.home(v), 'home'],
+    [/^\/help$/, (v) => App.views.help(v), 'help'],
     [/^\/search$/, (v, m, p) => App.views.search(v, p), 'search'],
     [/^\/archetype\/(.+)$/, (v, m) => App.views.archetype(v, decodeURIComponent(m[1])), 'search'],
     [/^\/releases$/, (v) => App.views.releases(v), 'releases'],
@@ -28,7 +30,7 @@
   ];
 
   App.router = function () {
-    const raw = location.hash.replace(/^#/, '') || '/search';
+    const raw = location.hash.replace(/^#/, '') || '/home';
     const qIndex = raw.indexOf('?');
     const path = qIndex === -1 ? raw : raw.slice(0, qIndex);
     const params = new URLSearchParams(qIndex === -1 ? '' : raw.slice(qIndex + 1));
@@ -40,7 +42,7 @@
     host.replaceChildren(page);
 
     let route = ROUTES.find((r) => r[0].test(path));
-    if (!route) { location.replace('#/search'); return; }
+    if (!route) { location.replace('#/home'); return; }
     const m = path.match(route[0]);
     U.$$('[data-nav]').forEach((a) => a.classList.toggle('active', a.getAttribute('data-nav') === route[2]));
     route[1](page, m, params);
