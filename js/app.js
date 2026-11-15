@@ -70,7 +70,9 @@
     if (e.key !== 'Escape') return;
     if (!document.getElementById('modal').hidden) { C.closeModal(); return; }
     // Esc goes back to the main menu, like a game (not from the duel board, to avoid accidents).
-    if (document.body.classList.contains('title-open') || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (document.body.classList.contains('title-open')) return;
+    // In a text box, Esc just leaves the box; press it again to go to the menu.
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.target.blur(); return; }
     const h = location.hash;
     if (h === '#/home' || h.indexOf('#/duel/play') === 0) return;
     App.sound.play('menu-move');
