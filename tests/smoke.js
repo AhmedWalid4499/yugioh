@@ -66,6 +66,23 @@ function apiResponse(url) {
     route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
   });
   await context.route('https://images.ygoprodeck.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG }));
+  // Fake Claude API: summons the first Level 1-4 monster in hand, attacks directly when it can.
+  const claudeCalls = [];
+  await context.route('https://api.anthropic.com/**', (route) => {
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors, body: '' });
+    const body = JSON.parse(route.request().postData());
+    claudeCalls.push(body);
+    const content = body.messages[0].content;
+    const state = JSON.parse(content.split('Game state:\n')[1]);
+    let actions = [];
+    if (/Battle Phase/.test(content)) actions = state.you.field.monsters.filter((m) => m.position === 'attack').map((m) => ({ type: 'attack', card: m.uid, target: state.opponent.field.monsters.length ? state.opponent.field.monsters[0].uid : 'direct' }));
+    else if (/Main Phase 1/.test(content)) {
+      const mon = state.you.hand.find((c) => c.atk != null && c.level >= 1 && c.level <= 4);
+      if (mon) actions.push({ type: 'normal_summon', card: mon.uid, position: 'attack' });
+    } else actions = [{ type: 'pass' }];
+    route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify({ stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_1', name: 'take_actions', input: { comment: 'Your move, duelist!', actions } }] }) });
+  });
 
   const shot = async (name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png'), fullPage: false }); };
 
@@ -213,6 +230,83 @@ function apiResponse(url) {
   const arch = await page.textContent('#arch-body');
   check(/Likely starters/.test(arch) && /Snake-Eye Ash/.test(arch), 'archetype page highlights starters');
   await shot('05-archetype');
+
+  console.log('Auto-build & draw tester');
+  await page.goto(URL_BASE + '#/build?a=lunalight');
+  await page.waitForSelector('#ab-result .pick', { timeout: 15000 });
+  const ab = await page.textContent('#ab-result');
+  check(/Lunalight \(auto-built\)/.test(ab) && /Lunalight Yellow Marten/.test(ab), 'typing "lunalight" auto-builds a Lunalight deck with its starter');
+  check(/Ash Blossom/.test(ab) && /Staple/.test(ab) && /Lunalight Cat Dancer/.test(ab), 'it adds staples and the Fusion monster to the Extra Deck');
+  await shot('07-autobuild');
+  await page.click('[data-save="test"]');
+  await page.waitForSelector('#dt-hand .hand-card');
+  check((await page.locator('#dt-hand .hand-card').count()) === 5, 'draw tester deals a 5-card opening hand');
+  check(/At least 1 starter/.test(await page.textContent('#dt-stats')), 'draw tester shows opening odds from 10,000 hands');
+  await page.check('#dt-second');
+  check((await page.locator('#dt-hand .hand-card').count()) === 6, 'going second deals 6 cards');
+  await page.click('#dt-draw');
+  check((await page.locator('#dt-hand .hand-card').count()) === 7, 'Draw 1 adds a card');
+  await shot('08-drawtest');
+
+  console.log('Duel vs bot');
+  await page.evaluate(() => localStorage.setItem('dv-duel-speed', '0'));
+  await page.click('a:has-text("Duel with this deck")');
+  await page.waitForSelector('#duel-form');
+  await page.selectOption('#duel-form [name=theirs]', '__mirror');
+  await page.selectOption('#duel-form [name=first]', 'me');
+  await page.check('#duel-form [name=ai][value=bot]');
+  await page.click('#duel-form button[type=submit]');
+  await page.waitForSelector('.board');
+  check((await page.locator('.hand-row.mine .card-slot').count()) === 5 && (await page.locator('.hand-row.theirs .hand-back').count()) === 5, 'both players start with 5 cards; the opponent\'s hand is hidden');
+  const toSummon = await page.evaluate(() => { const d = App.duelSession().duel; const c = d.players[0].hand.find((x) => d.kind(x) === 'monster' && !d.isExtra(x) && d.tributesNeeded(x) === 0); return c ? c.uid : null; });
+  if (toSummon) {
+    await page.click('[data-uid="' + toSummon + '"]');
+    await page.click('.menu-actions button:has-text("Normal Summon")');
+    if (await page.locator('[data-b]:has-text("Not now")').count()) await page.click('[data-b]:has-text("Not now")');
+    check(await page.evaluate(() => App.duelSession().duel.monsters(0).length === 1), 'Normal Summon through the card menu');
+  }
+  await shot('09-duel-board');
+  await page.click('#end-turn');
+  // Let the bot play; answer any "respond to the attack?" prompt with No response.
+  for (let i = 0; i < 100; i++) {
+    const st = await page.evaluate(() => { const d = App.duelSession().duel; return { a: d.active, t: d.turn, w: d.winner }; });
+    if ((st.a === 0 && st.t >= 3) || st.w != null) break;
+    if (await page.locator('[data-extra]:has-text("No response")').count()) await page.click('[data-extra]:has-text("No response")');
+    await page.waitForTimeout(100);
+  }
+  const afterBot = await page.evaluate(() => { const d = App.duelSession().duel; return { a: d.active, t: d.turn, log: d.log.map((l) => l.text).join('\n') }; });
+  check(afterBot.a === 0 && afterBot.t === 3 && /Turn 2: Bot/.test(afterBot.log), 'the bot plays its turn and passes back to you');
+  check(/Bot (Normal Summons|Tribute Summons|Sets a monster|activates|Sets a card)/.test(afterBot.log), 'the bot made plays on its turn');
+  const mine = await page.evaluate(() => { const d = App.duelSession().duel; const m = d.monsters(0).find((x) => x.card.faceUp && x.card.pos === 'atk'); return m ? m.card.uid : null; });
+  if (mine) {
+    await page.click('#to-battle');
+    await page.click('[data-uid="' + mine + '"]');
+    await page.click('.menu-actions button:has-text("Attack")');
+    if (await page.locator('.pick-grid .pick-card').count()) await page.click('.pick-grid .pick-card >> nth=0');
+    await page.waitForTimeout(300);
+    check(/attacks/.test(await page.textContent('#duel-log')), 'attack through the card menu (battle is calculated)');
+  }
+  await shot('10-duel-after-bot');
+
+  console.log('Duel vs Claude (mocked API)');
+  await page.goto(URL_BASE + '#/duel');
+  await page.waitForSelector('#duel-form');
+  await page.selectOption('#duel-form [name=theirs]', '__mirror');
+  await page.selectOption('#duel-form [name=first]', 'opp');
+  await page.check('#duel-form [name=ai][value=claude]');
+  await page.fill('#duel-form [name=key]', 'sk-ant-test');
+  await page.click('#duel-form button[type=submit]');
+  await page.waitForSelector('.board');
+  await page.waitForFunction(() => { const d = App.duelSession().duel; return d.active === 0 || d.winner != null; }, null, { timeout: 15000 });
+  const cl = await page.evaluate(() => { const d = App.duelSession().duel; return { log: d.log.map((l) => l.text).join('\n'), mons: d.monsters(1).length }; });
+  check(claudeCalls.length >= 1 && claudeCalls[0].model === 'claude-opus-5-5' && claudeCalls[0].tools[0].name === 'take_actions', 'Claude opponent calls the API with the take_actions tool');
+  check(/💬 Your move, duelist!/.test(cl.log) && cl.mons === 1, 'Claude\'s summon and comment show up on the board');
+  await shot('11-duel-claude');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(200);
+  check(!(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)), 'duel board fits a phone screen (no sideways scroll)');
+  await shot('12-duel-mobile');
+  await page.setViewportSize({ width: 1360, height: 900 });
 
   console.log('Mobile');
   await page.setViewportSize({ width: 390, height: 844 });

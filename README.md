@@ -40,6 +40,39 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
   - A **Download Excel template** button gives you a ready-made sheet to fill in.
   - Excel files exported by Duel Vault can be imported again to rebuild the same deck.
 
+### ⚡ Auto-Build
+- Type an archetype (for example **Lunalight**, Snake-Eye or Blue-Eyes), pick a format, and get a ready-to-play deck.
+- The builder reads every card in the archetype and ranks it by its role (starter, searcher, extender, Fusion enabler, boss). Starters get 3 copies.
+- It then adds generic staples for the format (optional): hand traps and board breakers in TCG/OCG, or classic staples in Goat.
+- It also fills the Extra Deck, with the archetype's Extra Deck monsters first.
+- You get a short game plan ("open with…, aim for…"), and each pick shows why it was chosen. Save it, then edit it in the deck builder like any other deck.
+- These are rule-based picks from card text, not tournament-tested lists. If an archetype has too few cards, it tells you how many slots are left to fill.
+
+### 🃏 Draw Tester
+- In any deck, open **🃏 Test hands** to deal opening hands, draw extra cards and toggle going first or second.
+- It runs **10,000 simulated hands** to show your chance of opening at least 1 starter, 2 or more starters, a brick, or a hand trap.
+- Tick which cards count as starters; the odds update instantly.
+
+### ⚔ Duel
+- Practice duels with any saved deck. Your opponent can use one of your decks, an auto-built deck from any archetype, or a mirror match.
+- **Built-in bot (free, offline):** summons its strongest monster (tributing when worth it), uses common Spells, Fusion Summons when it can, attacks only when it wins the fight, and keeps Traps set for your attacks.
+- **Claude AI opponent:** reads every card's text and plays its deck like a person, including effects the bot doesn't understand.
+  - Needs your own Anthropic API key, from console.anthropic.com. The key is saved only on your device and sent only to Anthropic.
+  - Choose Opus 5.5 (strongest, roughly $1–2 per duel), Sonnet 5.5 (roughly 50¢–$1) or Haiku 5.5 (roughly 5¢). These are rough estimates.
+  - If a request fails, the built-in bot plays that turn.
+- **What's automated:** turn and phase order, drawing, Normal and Tribute Summons, Sets, when Spells and Traps can be activated, position changes, battle, damage, LP and win conditions.
+- Common effects resolve with **one click**: draw, destroy, search, revive, burn, Fusion Summons, and Mirror Force-style Traps. Anything else you resolve with the card menus: move cards between zones, Special Summon, change ATK or LP, search the Deck.
+
+### 📜 Formats (rulings)
+Pick the format per deck (in the deck builder) and per duel. It sets the banlist, deck sizes, card legality, LP, hand size and zones:
+
+| Format | Banlist | LP | Hand | Main Deck | Notes |
+| --- | --- | --- | --- | --- | --- |
+| TCG Advanced | TCG | 8000 | 5 | 40–60 | Current Master Rule, Extra Monster Zones |
+| OCG | OCG | 8000 | 5 | 40–60 | Current Master Rule |
+| Speed Duel | — | 4000 | 4 | 20–30 | 3 Monster/Spell zones, Extra Deck 0–5 |
+| Goat | Goat (2005) | 8000 | 5 | 40–60 | First player draws; no Synchro, Xyz, Pendulum or Link |
+
 ## 🍎 Mac app
 
 ### Download and install
@@ -100,6 +133,14 @@ Plain HTML, CSS and JavaScript, with no build step. The files:
 | `js/components.js` | Card tiles and the card detail modal |
 | `js/view-*.js` | Search/Archetype, Releases/Set and Decks/Builder pages |
 | `js/app.js` | Hash router |
+| `js/formats.js` | Formats: banlists, deck sizes, LP, zones and legality |
+| `js/deckgen.js` | Auto-Build: archetype to deck |
+| `js/view-tools.js` | Auto-Build and Draw Tester pages |
+| `js/duel/engine.js` | Duel rules engine (zones, summons, phases, battle, LP) |
+| `js/duel/effects.js` | Effect reader: common effect wording to one-click resolution |
+| `js/duel/bot.js` | Built-in bot opponent |
+| `js/duel/claude.js` | Claude AI opponent (Messages API with a `take_actions` tool) |
+| `js/view-duel.js` | Duel setup and board |
 | `js/desktop.js` | Update button and version display (Mac app only) |
 | `desktop/` | Electron shell, preload bridge and updater |
 | `scripts/build-web.js` | Builds the web bundle, update zip and release notes |
@@ -122,4 +163,4 @@ npm test
 npm run build:web && npm run test:desktop
 ```
 
-`npm test` runs the updater unit tests and the web smoke test against a mocked card API. The second command runs the desktop app end to end, including a one-click update. On Linux, wrap it in `xvfb-run -a`.
+`npm test` runs the updater unit tests, the duel and format unit tests, and the web smoke test against mocked card and Claude APIs. The second command runs the desktop app end to end, including a one-click update. On Linux, wrap it in `xvfb-run -a`.

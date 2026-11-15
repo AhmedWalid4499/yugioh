@@ -55,13 +55,17 @@
 
   C.closeModal = function () {
     const m = modal();
+    const cb = C._onClose;
+    C._onClose = null;
     m.hidden = true;
     document.body.classList.remove('modal-open');
     if (C._lastFocus && C._lastFocus.focus) C._lastFocus.focus();
+    if (cb) cb();
   };
 
   C.openModal = function (html) {
     const m = modal();
+    C._onClose = null;
     C._lastFocus = document.activeElement;
     document.getElementById('modal-body').innerHTML = html;
     m.hidden = false;

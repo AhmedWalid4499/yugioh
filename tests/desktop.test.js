@@ -87,7 +87,7 @@ async function mockApis(app) {
   await win.waitForSelector('.card-tile', { timeout: 20000 });
   check(/^app:\/\/duel-vault\//.test(win.url()), 'loads the web app from the private app:// address');
   check((await win.title()) === 'Duel Vault', 'window title is Duel Vault');
-  check((await win.textContent('#app-version')).trim() === 'v1.1.0', 'footer shows the installed version (v1.1.0)');
+  check((await win.textContent('#app-version')).trim() === 'v' + require('../package.json').version, 'footer shows the installed version (v' + require('../package.json').version + ')');
   check(await win.isVisible('#app-update'), 'update button is shown in the desktop app');
 
   // Make a deck so we can confirm it survives the update.

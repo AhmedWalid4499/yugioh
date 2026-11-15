@@ -183,7 +183,7 @@
           '<p>' + U.plural(cards.length, 'card') + ' in this archetype: ' + groups.monster.length + ' Main Deck monsters, ' + groups.extra.length + ' Extra Deck monsters, ' + groups.spell.length + ' Spells, ' + groups.trap.length + ' Traps.</p>' +
           '<div class="chips">' + chips + '</div>' +
           (starters.length ? '<p class="small">Likely starters: ' + starters.slice(0, 8).map((c) => '<a href="#" data-card-id="' + c.id + '">' + esc(c.name) + '</a>').join(', ') + '. Build around these and run as many as the banlist allows.</p>' : '') +
-          '<div class="row"><button type="button" class="btn btn-primary" id="arch-new-deck">Start a "' + esc(name) + '" deck</button></div>' +
+          '<div class="row"><a class="btn btn-primary" href="#/build?a=' + encodeURIComponent(name) + '">⚡ Auto-build a ' + esc(name) + ' deck</a><button type="button" class="btn" id="arch-new-deck">Start an empty "' + esc(name) + '" deck</button></div>' +
         '</div>' +
         section('Main Deck monsters', groups.monster) +
         section('Extra Deck monsters', groups.extra) +
