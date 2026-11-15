@@ -158,6 +158,7 @@
     c.posChanged = false;
     c.atkMod = 0;
     c.defMod = 0;
+    c.effectsNegated = false;
     c.controller = undefined;
   }
 
@@ -263,6 +264,7 @@
     if (this.winner != null) return;
     this.phase = 'end';
     // Temporary ATK/DEF changes "until the end of this turn" are cleared.
+    this.all().forEach((x) => { x.card.effectsNegated = false; });
     this.all().forEach((x) => { if (['mz', 'emz'].indexOf(x.zone) !== -1 && x.card.tempMod) { x.card.atkMod -= x.card.tempMod.atk; x.card.defMod -= x.card.tempMod.def; x.card.tempMod = null; } });
     this.active = this.opp(this.active);
     this.startTurn();
@@ -617,6 +619,28 @@
         break;
       }
       case 'shuffle_deck': shuffle(this.players[p].deck); this.say(this.pname(p) + ' ' + this.v(p, 'shuffles their', 'shuffle your') + ' Deck.', p); break;
+      case 'set_st': {
+        // Set a Spell/Trap directly (e.g. "Set 1 … from your Deck").
+        if (needCard()) return needCard();
+        const c = card.card;
+        const pl = this.players[p];
+        const isField = this.kind(c) === 'spell' && /Field/.test(c.data.race || '');
+        const z = isField ? -2 : this.freeSt(p);
+        if (z === -1) return fail('Your Spell & Trap Zones are full.');
+        this.remove(c.uid);
+        if (isField) { if (pl.field) this.sendTo(pl.field.uid, 'gy', 'replaced'); pl.field = c; } else pl.st[z] = c;
+        c.faceUp = false;
+        c.setTurn = this.turn;
+        this.fx('set', { uid: c.uid, player: p, spellTrap: true });
+        this.say(this.pname(p) + ' ' + this.v(p, 'Sets', 'Set') + ' a card from the ' + (card.zone === 'deck' ? 'Deck' : card.zone) + '.', p);
+        break;
+      }
+      case 'negate_effects': {
+        if (needCard()) return needCard();
+        card.card.effectsNegated = true;
+        this.say(card.card.name + '\'s effects are negated.', p);
+        break;
+      }
       default: return fail('Unknown op ' + op.op + '.');
     }
     this.changed();

@@ -2,6 +2,23 @@
 
 Each `## <version>` section becomes the "What's new" text shown in the app's update dialog and on the GitHub Release page.
 
+## 1.8.0
+- **Card effects now follow the rules.** Each card's text is split into its separate effects, the way the rules read it. Only the effect you choose is used; before, the app ran the first thing it recognised anywhere in the card's text.
+- **Timing:**
+  - Hand traps like Ash Blossom and Effect Veiler only work in response.
+  - "If this card is Summoned" effects are offered right after the summon, not at any time.
+  - Traps like Mirror Force can only be activated when a monster attacks.
+  - Ignition effects only work in your Main Phase.
+- **Where:** effects only work from the zone their text says: hand, field or GY.
+- **Conditions:** checks such as "if you control no monsters", "if your opponent controls a monster" or "if you control no face-up cards" (Lightning Storm).
+- **Costs come first:** discarding, Tributing, banishing from the GY, paying LP, detaching materials and banishing from the Deck. You pick which cards pay.
+- **Once per turn** is tracked for each effect separately ("each effect of … once per turn"), or for the whole card when its text says so.
+- **"Activate 1 of these effects"** cards (Lightning Storm, Triple Tactics Talent, Elemental HERO Stratos…) let you choose the option.
+- **Your choice of effect:** cards with several effects ask which one to use. Greyed-out effects say why they can't be used now.
+- **Special Summon (by its own rule):** cards like Dark Magician Girl the Magician's Apprentice and Cyber Dragon have a button for their own Special Summon, with its condition and cost checked.
+- **Partly automatic effects:** when the app can only do part of an effect, it says exactly which part is yours to do with the card menus.
+- **Smarter, fairer bot:** it follows the same rules. It pays its costs, respects conditions and once-per-turn limits, and only uses effects it fully understands. It now uses its monsters' effects too.
+
 ## 1.7.0
 - **A new game-style look:** a midnight duel-arena theme with gold and cyan light, game-style windows, buttons and menu bar.
 - **Title screen:** the app opens on an animated title screen. Press **Start** (click or Enter) to begin.

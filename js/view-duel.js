@@ -439,7 +439,7 @@
             '<div class="turn-box"><div class="row-between"><div><strong>Turn ' + duel.turn + '</strong> · ' + (myTurn ? 'Your turn' : esc(duel.pname(1)) + '\'s turn') + '</div><button type="button" class="btn btn-small btn-ghost" data-tool="help" title="How to play (shortcut: ?)">❓ How to play</button></div>' +
               '<p class="guide" id="duel-guide">' + esc(guide()) + '</p>' +
               '<div class="phases">' + ['main1', 'battle', 'main2', 'end'].map((x) => '<span class="' + (x === ph ? 'on' : '') + '">' + App.Duel.PHASE_LABEL[x].replace(' Phase', '').replace('Main ', 'M') + '</span>').join('') + '</div>' +
-              (s.resolving ? '<div class="resolving">Resolving <strong>' + esc(s.resolving.name) + '</strong>: use the card menus for its effect, then <button type="button" class="btn btn-small btn-primary" id="resolve-done">Done</button></div>' : '') +
+              (s.resolving ? '<div class="resolving">Resolving <strong>' + esc(s.resolving.name) + '</strong>: ' + (s.resolving.todo ? 'do this with the card menus: <em>' + esc(s.resolving.todo) + '</em> ' : 'use the card menus for its effect, ') + 'then <button type="button" class="btn btn-small btn-primary" id="resolve-done">Done</button></div>' : '') +
               '<div class="row">' +
                 (canAct && ph === 'main1' && duel.canEnterBattle() ? '<button type="button" class="btn btn-primary" id="to-battle">⚔ Battle Phase</button>' : '') +
                 (canAct && ph === 'battle' ? '<button type="button" class="btn" id="to-main2">Main Phase 2</button>' : '') +
@@ -689,8 +689,9 @@
       const pos = await ask('Position', '', [{ label: 'Attack', value: 'atk', primary: true }, { label: 'Defense', value: 'def' }]);
       if (!pos) return;
       const r = duel.specialSummon(0, c.uid, pos, { how: 'effect', zone: zone });
-      if (r.ok) await opponentRespondsToSummon(c);
-      if (!r.ok) U.toast(r.message);
+      if (!r.ok) { U.toast(r.message); return; }
+      await opponentRespondsToSummon(c);
+      await summonTriggers(c, 'special');
     }
 
     /* ---------- opponent's turn ---------- */
@@ -727,67 +728,183 @@
 
     /* ---------- your actions ---------- */
 
+    /* The text of one effect, for dialogs. */
+    function effectHtml(card, e) {
+      if (!e) return descHtml(card);
+      return '<div class="effect-text">' + esc(e.text).replace(/\n/g, '<br>') + '</div>' +
+        (e.notes && e.notes.length ? '<p class="muted small">' + esc(e.notes.join(' ')) + '</p>' : '') +
+        '<details class="small"><summary>Full card text</summary>' + descHtml(card) + '</details>';
+    }
+
+    /* Choose one of an effect's options ("Activate 1 of these effects"). */
+    async function pickMode(card, pf) {
+      if (!pf || !pf.modes) return pf;
+      const i = await ask(card.name + ': choose 1 effect', '<p class="muted small">This effect lets you choose one of these.</p>',
+        pf.modes.map((m, k) => ({ label: m.modeText + (m.understood ? '' : ' (by hand)'), value: String(k), primary: k === 0 && m.understood })).concat([{ label: 'Cancel', value: null }]));
+      return i == null ? null : pf.modes[Number(i)];
+    }
+
+    /* Pays an effect's costs, asking you which cards to use. False if cancelled or not payable. */
+    async function payCosts(card, costs) {
+      if (!costs || !costs.length) return true;
+      const problem = App.Effects.costProblem(duel, 0, card, costs);
+      if (problem) { App.sound.play('invalid'); U.toast('Can\'t pay the cost: ' + problem); return false; }
+      const picks = [];
+      for (let i = 0; i < costs.length; i++) {
+        const c = costs[i];
+        if (c.type !== 'choose') { picks.push(null); continue; }
+        const pool = App.Effects.costPool(duel, 0, card, c);
+        const got = pool.length === c.count && c.from !== 'hand' ? pool.map((x) => x.uid)
+          : await choose('Cost: ' + c.label, pool, { count: c.count, min: c.count, confirm: c.label, note: 'Choose the card' + (c.count > 1 ? 's' : '') + ' to pay the cost with.' });
+        if (!got) return false;
+        picks.push(got);
+      }
+      App.Effects.payCost(duel, 0, card, costs, picks);
+      duel.say('You pay the cost: ' + costs.map((c) => c.label.toLowerCase()).join(', ') + '.', 0);
+      return true;
+    }
+
     async function resolveEffect(card, pf, isST, ctx) {
-      const isFusion = pf && pf.fusion;
-      const autoOk = pf && !isFusion && (!pf.choose || pf.choose.pool.length) && (pf.ops.length || pf.choose || pf.negateAttack);
+      if (pf && pf.modes) { pf = await pickMode(card, pf); if (!pf) { if (isST) duel.finishActivation(card.uid); return; } }
+      const steps = (pf && pf.steps) || [];
+      const isFusion = steps.some((x) => x.fusion);
+      const chooseSteps = steps.filter((x) => x.choose);
+      const autoOk = pf && pf.understood && !isFusion && chooseSteps.every((x) => x.choose.pool.length);
       const buttons = [];
       if (isFusion) buttons.push({ label: 'Fusion Summon: choose the monster and its materials', value: 'fusion', primary: true });
       else if (autoOk) buttons.push({ label: 'Auto-resolve: ' + pf.summary, value: 'auto', primary: true });
       if (ctx && ctx.attack) buttons.push({ label: 'It negates the attack', value: 'negate' });
       buttons.push({ label: autoOk || isFusion ? 'Resolve manually' : 'Resolve it with the card menus', value: 'manual', primary: !autoOk && !isFusion });
-      const choice = await ask('Resolve ' + card.name, descHtml(card) + (pf && !autoOk && !isFusion ? '<p class="muted small">' + esc(pf.summary) + '.</p>' : ''), buttons);
+      const empty = pf && pf.understood && chooseSteps.some((x) => !x.choose.pool.length);
+      const info = !pf ? '<p class="muted small">The app can\'t resolve this effect by itself: do it with the card menus.</p>'
+        : (empty ? '<p class="warn small">There is nothing to choose for this effect right now.</p>' : '') +
+          (pf.understood && pf.manual ? '<p class="small"><strong>Auto-resolve does:</strong> ' + esc(pf.summary) + '.<br><strong>You do by hand:</strong> ' + esc(pf.manual) + '</p>' : '') +
+          (!pf.understood ? '<p class="muted small">The app can\'t resolve this effect by itself: do it with the card menus, then press Done.</p>' : '');
+      const choice = await ask('Resolve ' + card.name, effectHtml(card, pf && pf.effect) + info, buttons);
       if (choice === 'fusion') {
         await fusionFlow(pf.fromDeck);
         if (isST) duel.finishActivation(card.uid);
       } else if (choice === 'auto') {
-        let chosen = [];
-        if (pf.choose) {
-          const cards = pf.choose.pool.map((u) => duel.find(u)).filter(Boolean).map((x) => x.card);
-          chosen = await choose(pf.choose.label, cards, { sub: (c) => { const l = duel.find(c.uid); return l.player === 0 ? 'yours · ' + l.zone : 'opponent · ' + l.zone; } }) || [];
+        const chosen = [];
+        for (const st of chooseSteps) {
+          const ch = st.choose;
+          const cards = ch.pool.map((u) => duel.find(u)).filter(Boolean).map((x) => x.card);
+          const pick = await choose(ch.label, cards, { count: ch.count, min: Math.min(ch.min || 1, cards.length), confirm: 'Confirm', sub: (c) => { const l = duel.find(c.uid); return l.player === 0 ? 'yours · ' + l.zone : 'opponent · ' + l.zone; } });
+          chosen.push(pick || []);
         }
         App.Effects.run(duel, 0, pf, chosen);
         if (pf.discard) {
           const disc = await choose('Discard ' + pf.discard, duel.players[0].hand.slice(), { count: pf.discard, min: Math.min(pf.discard, duel.players[0].hand.length), confirm: 'Discard' });
           (disc || duel.players[0].hand.slice(0, pf.discard).map((c) => c.uid)).forEach((u) => duel.sendTo(u, 'gy', 'discarded'));
         }
+        if (pf.manual) { s.resolving = { uid: card.uid, name: card.name, isST: isST, todo: pf.manual }; render(); return; }
         if (isST) duel.finishActivation(card.uid);
       } else if (choice === 'negate') {
         duel.negateAttack();
         if (isST) duel.finishActivation(card.uid);
       } else {
-        s.resolving = { uid: card.uid, name: card.name, isST: isST };
+        s.resolving = { uid: card.uid, name: card.name, isST: isST, todo: pf && pf.effect ? pf.effect.action : '' };
         render();
       }
     }
 
+    /* Activate a Spell/Trap: its activation effect only, after checking timing, condition and cost. */
     async function activateFlow(uid, ctx, zoneIndex) {
       const pre = duel.find(uid);
-      if (pre && !(await oncePerTurnOk(pre.card))) return;
+      if (!pre) return;
+      const card = pre.card;
+      const problem = App.Effects.activationProblem(duel, 0, card, ctx);
+      if (problem) {
+        App.sound.play('invalid');
+        const go = await ask('Can\'t activate ' + card.name + ' now', '<p>' + esc(problem) + '</p>', [{ label: 'OK', value: false, primary: true }, { label: 'Activate anyway (another card allows it)', value: true }]);
+        if (!go) return;
+      }
+      let pf = App.Effects.plan(duel, 0, card, ctx);
+      if (pf && pf.modes) { pf = await pickMode(card, pf); if (!pf) return; }
+      const costs = (pf && pf.cost) || [];
+      if (!problem && App.Effects.costProblem(duel, 0, card, costs)) { App.sound.play('invalid'); U.toast('Can\'t pay the cost: ' + App.Effects.costProblem(duel, 0, card, costs)); return; }
       const r = duel.activateSpellTrap(0, uid, zoneIndex);
       if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); return; }
-      duel.markUsed(0, r.card);
-      const pf = App.Effects.plan(duel, 0, r.card, ctx);
+      if (!(await payCosts(r.card, costs))) { duel.finishActivation(r.card.uid); return; }
+      if (pf) App.Effects.markUsed(duel, 0, r.card, pf.effect);
       if (await negatedByOpponent(r.card, pf, false)) { duel.finishActivation(r.card.uid); return; }
       await resolveEffect(r.card, pf, true, ctx);
     }
 
-    /* A monster effect you activate (from hand, field or GY). */
-    async function monsterEffectFlow(c) {
-      if (!(await oncePerTurnOk(c))) return;
+    /* Which effect of this card? Only the ones usable now, unless forced (manual). */
+    async function pickEffect(c, opts) {
+      const o = opts || {};
+      const list = App.Effects.options(duel, 0, c, o);
+      const usable = o.force ? list : list.filter((x) => x.ok);
+      if (!usable.length) {
+        App.sound.play('invalid');
+        const go = await ask(c.name, (list.length
+          ? '<p>None of its effects can be used right now:</p><ul class="effect-list">' + list.map((x) => '<li>' + esc(x.effect.text) + '<br><span class="why small">' + esc(x.why) + '</span></li>').join('') + '</ul>'
+          : '<p>This card has no effect you activate (its effects are continuous, or it has none).</p>'),
+        [{ label: 'OK', value: false, primary: true }].concat(list.length ? [{ label: 'Use one anyway (another card allows it)', value: true }] : []));
+        return go ? pickEffect(c, Object.assign({}, o, { force: true })) : null;
+      }
+      if (usable.length === 1) return usable[0].effect;
+      const i = await dialog('<h2 id="modal-title">' + esc(c.name) + ': which effect?</h2><div class="effect-pick">' +
+        usable.map((x, k) => '<button type="button" class="effect-choice" data-k="' + k + '"' + (x.ok ? '' : ' data-off') + '><span>' + esc(x.effect.text) + '</span>' + (x.ok ? '' : '<span class="why small">' + esc(x.why) + '</span>') + '</button>').join('') +
+        '</div><div class="row"><button type="button" class="btn btn-ghost" data-cancel>Cancel</button></div>',
+        (body, done) => body.addEventListener('click', (ev) => {
+          const b = ev.target.closest('[data-k]');
+          if (b) done(Number(b.getAttribute('data-k')));
+          if (ev.target.closest('[data-cancel]')) done(null);
+        }));
+      return i == null ? null : usable[i].effect;
+    }
+
+    /* Uses one effect of a monster (or a face-up Spell/Trap): cost, chain, resolution. */
+    async function useEffect(c, e, o) {
+      const opts = o || {};
+      if (App.Effects.used(duel, 0, c, e) && !opts.force) {
+        const go = await ask('Once per turn', '<p>You already used this effect of ' + esc(c.name) + ' this turn.</p>', [{ label: 'Cancel', value: false, primary: true }, { label: 'Use it anyway (another card allows it)', value: true }]);
+        if (!go) return;
+      }
+      let pf = App.Effects.planFor(duel, 0, c, e);
+      if (pf.modes) { pf = await pickMode(c, pf); if (!pf) return; }
       const loc = duel.find(c.uid);
+      const onField = loc && (loc.zone === 'mz' || loc.zone === 'emz');
+      if (!(await payCosts(c, pf.cost))) return;
+      App.Effects.markUsed(duel, 0, c, e);
       duel.say('You activate ' + c.name + '\'s effect' + (loc && loc.zone === 'gy' ? ' in the GY' : loc && loc.zone === 'hand' ? ' from your hand' : '') + '.', 0);
-      duel.fx('activate', { uid: c.uid, player: 0, kind: 'monster' });
-      duel.markUsed(0, c);
-      const pf = App.Effects.plan(duel, 0, c, { summoned: true });
-      if (await negatedByOpponent(c, pf, loc && (loc.zone === 'mz' || loc.zone === 'emz'))) return;
+      duel.fx('activate', { uid: c.uid, player: 0, kind: duel.kind(c) });
+      if (await negatedByOpponent(c, pf, onField)) return;
       await resolveEffect(c, pf, false);
     }
 
-    async function oncePerTurnOk(c) {
-      if (!duel.isOncePerTurn(c) || !duel.usedThisTurn(0, c)) return true;
-      const go = await ask('Once per turn', '<p>You already used ' + esc(c.name) + '\'s effect this turn. Its text says it can only be used once per turn.</p>',
-        [{ label: 'Cancel', value: false, primary: true }, { label: 'Activate anyway (another effect allows it)', value: true }]);
-      return !!go;
+    /* A monster effect you activate (from hand, field or GY), or a face-up Spell/Trap's effect. */
+    async function monsterEffectFlow(c, opts) {
+      const e = await pickEffect(c, opts);
+      if (e) await useEffect(c, e, opts);
+    }
+
+    /* "If this card is … Summoned": offer its effect right after the summon. */
+    async function summonTriggers(c, how) {
+      const loc = duel.find(c.uid);
+      if (!loc || (loc.zone !== 'mz' && loc.zone !== 'emz') || !c.faceUp) return;
+      const list = App.Effects.options(duel, 0, c, { event: how }).filter((x) => x.effect.type === 'trigger' && x.effect.event && x.effect.event.indexOf(how) !== -1);
+      for (const x of list) {
+        if (!x.ok) { duel.say(c.name + '\'s effect can\'t be used: ' + x.why, 0); continue; }
+        const optional = /you can/i.test(x.effect.pre + ' ' + x.effect.action);
+        const go = await ask(c.name + ' was ' + (how === 'normal' ? 'Normal' : 'Special') + ' Summoned', effectHtml(c, x.effect),
+          [{ label: 'Use its effect', value: true, primary: true }].concat(optional ? [{ label: 'Not now', value: false }] : []));
+        if (go) await useEffect(c, x.effect, { force: true });
+      }
+    }
+
+    /* "You can Special Summon this card (from your hand) by …" */
+    async function procedureFlow(c, proc) {
+      if (!(await payCosts(c, proc.costs))) return;
+      App.Effects.markUsed(duel, 0, c, proc.effect);
+      const pos = proc.defense ? 'def' : await ask('Position', '', [{ label: 'Attack', value: 'atk', primary: true }, { label: 'Defense', value: 'def' }]);
+      if (!pos) return;
+      const r = duel.specialSummon(0, c.uid, pos, { how: 'its own rule' });
+      if (!r.ok) { U.toast(r.message); return; }
+      await opponentRespondsToSummon(c);
+      await summonTriggers(c, 'special');
     }
 
     /* Gives the opponent a chance to chain to your activation. True if they negated it. */
@@ -839,20 +956,20 @@
       const loc = duel.find(pick[0]);
       const c = loc.card;
       const ctx = ev.type === 'summon' ? { summon: ev.uid } : { activation: ev };
-      let pf;
+      let pf = App.Effects.plan(duel, 0, c, ctx);
       if (duel.kind(c) === 'monster') {
-        if (loc.zone === 'hand') duel.sendTo(c.uid, 'gy', 'activated from the hand');
+        if (pf && pf.cost && pf.cost.length) { if (!(await payCosts(c, pf.cost))) return {}; }
+        else if (loc.zone === 'hand') duel.sendTo(c.uid, 'gy', 'activated from the hand');
         duel.say('You activate ' + c.name + '.', 0);
         duel.fx('activate', { uid: c.uid, player: 0, kind: 'monster' });
-        pf = App.Effects.plan(duel, 0, c, ctx);
       } else {
         const r = duel.activateSpellTrap(0, c.uid);
         if (!r.ok) { U.toast(r.message); return {}; }
-        pf = App.Effects.plan(duel, 0, c, ctx);
+        if (pf && pf.cost && pf.cost.length && !(await payCosts(c, pf.cost))) { duel.finishActivation(c.uid); return {}; }
       }
-      duel.markUsed(0, c);
+      if (pf) App.Effects.markUsed(duel, 0, c, pf.effect);
       const negates = pf && pf.negateActivation;
-      const choice = await ask('Resolve ' + c.name, descHtml(c), [].concat(
+      const choice = await ask('Resolve ' + c.name, effectHtml(c, pf && pf.effect), [].concat(
         pf && (pf.ops.length || pf.negateActivation) ? [{ label: 'Auto-resolve: ' + pf.summary, value: 'auto', primary: true }] : [],
         ev.type === 'activate' ? [{ label: 'It negates ' + ev.card.name, value: 'negate' }] : [],
         [{ label: 'Resolve manually', value: 'manual' }]));
@@ -872,6 +989,7 @@
         if (owner === 0) {
           const pf = App.Effects.plan(duel, 0, loc.card, { flip: true, summoned: true });
           duel.say(loc.card.name + '\'s FLIP effect activates.', 0);
+          if (pf && pf.cost && pf.cost.length && !(await payCosts(loc.card, pf.cost))) continue;
           await resolveEffect(loc.card, pf, false);
         } else {
           duel.pendingFlips.unshift(uid);
@@ -893,13 +1011,7 @@
       if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); return; }
       if (pos !== 'set') await opponentRespondsToSummon(c);
       if (!duel.find(c.uid) || duel.find(c.uid).zone !== 'mz') return;
-      if (pos !== 'set' && /if this card is normal (or special )?summoned/i.test(c.data.desc || '')) {
-        const pf = App.Effects.plan(duel, 0, c, { summoned: true });
-        if (pf) {
-          const go = await ask(c.name + ' was summoned', descHtml(c), [{ label: 'Use its effect', value: true, primary: true }, { label: 'Not now', value: false }]);
-          if (go) { duel.say('You activate ' + c.name + '\'s effect.', 0); await resolveEffect(c, pf, false); }
-        }
-      }
+      if (pos !== 'set') await summonTriggers(c, 'normal');
     }
 
     function matSub(x) {
@@ -951,6 +1063,7 @@
       const r = duel.specialSummon(0, c.uid, pos, { materials: mats, how: kind, zone: o.zone });
       if (!r.ok) { App.sound.play('invalid'); U.toast(r.message); return; }
       await opponentRespondsToSummon(c);
+      await summonTriggers(c, 'special');
     }
 
     async function attackFlow(c, presetTarget) {
@@ -1017,29 +1130,33 @@
       if (loc.zone === 'hand') {
         if (k === 'monster') {
           const need = duel.tributesNeeded(c);
+          const proc = App.Effects.procedure(duel, 0, c);
+          const fromHand = App.Effects.options(duel, 0, c).filter((x) => x.effect.locs.indexOf('hand') !== -1);
           const have = duel.monsters(0).length;
           const why = duel.active !== 0 ? 'Only on your turn.' : !duel.isMain() ? 'Only in your Main Phase.' : duel.players[0].normalSummoned ? 'You already Normal Summoned or Set a monster this turn.' :
             need > have ? 'Needs ' + need + ' Tribute' + (need > 1 ? 's' : '') + ': you control ' + (have || 'no') + ' monster' + (have === 1 ? '' : 's') + '.' : '';
           add(need ? 'Tribute Summon' : 'Normal Summon', () => summonFlow(c, 'atk'), true, why);
           add('Set (face-down)', () => summonFlow(c, 'set'), false, why);
-          if (/(from|in) your hand|discard this card|reveal this card|special summon this card/i.test(desc)) add('Activate effect from hand', () => monsterEffectFlow(c));
-          else manual('Activate effect from hand', () => monsterEffectFlow(c));
+          if (proc) add('Special Summon (by its own rule)', () => procedureFlow(c, proc), true, proc.ok ? '' : proc.why);
+          if (fromHand.length) add('Activate effect from hand', () => monsterEffectFlow(c), false, fromHand.some((x) => x.ok) ? '' : fromHand[0].why);
+          manual('Activate an effect anyway', () => monsterEffectFlow(c, { force: true }));
           specialManual('Special Summon (by an effect)');
         } else if (k === 'spell') {
           const quick = /Quick-Play/.test(c.data.race || '');
-          add('Activate', () => activateFlow(c.uid), true, duel.active !== 0 && !quick ? 'Only on your turn.' : !main && !quick ? 'Only in your Main Phase.' : '');
+          add('Activate', () => activateFlow(c.uid), true, duel.active !== 0 && !quick ? 'Only on your turn.' : !main && !quick ? 'Only in your Main Phase.' : App.Effects.activationProblem(duel, 0, c));
           add('Set', () => { const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); }, false, main ? '' : 'Only in your Main Phase.');
         } else {
           add('Set', () => { const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); }, true, main ? '' : 'Only in your Main Phase.');
-          if (/activate this card from your hand/i.test(desc)) add('Activate', () => activateFlow(c.uid));
+          if (/activate this card from your hand/i.test(desc)) add('Activate', () => activateFlow(c.uid), false, App.Effects.activationProblem(duel, 0, c));
           else manual('Activate from hand', () => activateFlow(c.uid));
         }
         moveSet(['hand']);
       } else if (loc.zone === 'mz' || loc.zone === 'emz') {
         if (myTurn && duel.phase === 'battle') add('Attack', () => attackFlow(c), true, !c.faceUp || c.pos !== 'atk' ? 'Only face-up Attack Position monsters can attack.' : c.attacked ? 'This monster already attacked this turn.' : '');
         if (main) add(c.faceUp ? 'Change battle position' : 'Flip Summon', async () => { const wasDown = !c.faceUp; const r = duel.changePosition(0, c.uid); if (!r.ok) { U.toast(r.message); return; } if (wasDown) { await opponentRespondsToSummon(c); await processFlips(); } });
-        if (c.faceUp && /effect/i.test(c.data.type || '')) add('Activate effect', () => monsterEffectFlow(c));
-        else manual('Activate effect', () => monsterEffectFlow(c));
+        const onField = App.Effects.options(duel, 0, c).filter((x) => x.effect.locs.indexOf('field') !== -1);
+        if (onField.length) add('Activate effect', () => monsterEffectFlow(c), false, onField.some((x) => x.ok) ? '' : onField[0].why);
+        manual('Activate an effect anyway', () => monsterEffectFlow(c, { force: true }));
         manual('Change ATK', () => modifyAtk(c));
         manual('Destroy', () => duel.destroy(c.uid, 'you'));
         manual('Turn face-down', () => duel.applyOp(0, { op: 'flip_face_down', card: c.uid }));
@@ -1047,8 +1164,12 @@
       } else if (loc.zone === 'st' || loc.zone === 'field') {
         if (!c.faceUp) {
           const tooSoon = duel.kind(c) === 'trap' && c.setTurn != null && c.setTurn >= duel.turn;
-          add('Activate', () => activateFlow(c.uid), true, tooSoon ? 'A Trap can\'t be activated the turn it was Set.' : '');
-        } else add('Activate effect', async () => { if (!(await oncePerTurnOk(c))) return; duel.say('You activate ' + c.name + '\'s effect.', 0); duel.markUsed(0, c); const pf = App.Effects.plan(duel, 0, c); if (await negatedByOpponent(c, pf, true)) return; await resolveEffect(c, pf, false); });
+          add('Activate', () => activateFlow(c.uid), true, tooSoon ? 'A Trap can\'t be activated the turn it was Set.' : App.Effects.activationProblem(duel, 0, c));
+        } else {
+          const stOpts = App.Effects.options(duel, 0, c).filter((x) => x.effect.locs.indexOf('field') !== -1);
+          if (stOpts.length) add('Activate effect', () => monsterEffectFlow(c), true, stOpts.some((x) => x.ok) ? '' : stOpts[0].why);
+          manual('Activate an effect anyway', () => monsterEffectFlow(c, { force: true }));
+        }
         manual('Destroy', () => duel.destroy(c.uid, 'you'));
         moveSet(['gy']);
       } else if (loc.zone === 'extra') {
@@ -1057,7 +1178,8 @@
         manual('Banish', () => duel.sendTo(c.uid, 'banished'));
       } else {
         // gy, banished, deck
-        if (loc.zone === 'gy' && /(in your gy|from your gy|this card is in your (gy|graveyard)|banish this card from your gy)/i.test(desc)) add('Activate its effect in the GY', () => monsterEffectFlow(c), true);
+        const here = App.Effects.options(duel, 0, c).filter((x) => x.effect.locs.indexOf(loc.zone) !== -1);
+        if (here.length && (loc.zone === 'gy' || loc.zone === 'banished')) add('Activate its effect' + (loc.zone === 'gy' ? ' in the GY' : ''), () => monsterEffectFlow(c), true, here.some((x) => x.ok) ? '' : here[0].why);
         if (k === 'monster' && !duel.isExtra(c)) specialManual('Special Summon');
         if (k === 'monster' && duel.isExtra(c) && loc.zone !== 'deck') manual('Special Summon', () => duel.specialSummon(0, c.uid, 'atk', { how: 'effect' }));
         if (k !== 'monster' && loc.zone !== 'deck') manual('Set it on the field', () => { duel.sendTo(c.uid, 'hand', false); const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); });

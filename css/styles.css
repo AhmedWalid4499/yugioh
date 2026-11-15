@@ -973,3 +973,13 @@ body.title-open { overflow: hidden; }
 .wb-kicker { font-family: var(--ui-font); font-weight: 700; letter-spacing: .3em; text-transform: uppercase; color: var(--cyan); font-size: .8rem; }
 .wb-rec { font-family: var(--ui-font); font-weight: 700; }
 .wb-rec .w { color: var(--ok); } .wb-rec .l { color: var(--danger); }
+
+/* Effect picker and effect text (1.8.0) */
+.effect-text { padding: 10px 12px; border-radius: 6px; background: rgba(0, 0, 0, .3); border-left: 3px solid var(--accent); margin-bottom: 8px; }
+.effect-pick { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.effect-choice { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 6px; background: rgba(0, 0, 0, .3); border: 1px solid rgba(100, 140, 255, .35); }
+.effect-choice:hover, .effect-choice:focus-visible { border-color: var(--accent); box-shadow: 0 0 12px rgba(242, 193, 78, .35); }
+.effect-choice[data-off] { opacity: .7; }
+.effect-list { padding-left: 18px; }
+.effect-list li { margin-bottom: 8px; }
+.resolving em { color: var(--accent); font-style: normal; }
