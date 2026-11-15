@@ -63,6 +63,20 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 - **What's automated:** turn and phase order, drawing, Normal and Tribute Summons, Sets, when Spells and Traps can be activated, position changes, battle, damage, LP and win conditions.
 - Common effects resolve with **one click**: draw, destroy, search, revive, burn, Fusion Summons, and Mirror Force-style Traps. Anything else you resolve with the card menus: move cards between zones, Special Summon, change ATK or LP, search the Deck.
 
+### 🌟 Famous duelists
+Pick an opponent from the anime, each with a **modern version of their deck**. It's built live from the newest support cards in the database and always includes their ace and signature cards:
+
+| Series | Duelists |
+| --- | --- |
+| Duel Monsters | Yugi (Dark Magician), Kaiba (Blue-Eyes), Joey (Red-Eyes), Mai (Harpie), Pegasus (Toon) |
+| GX | Jaden (Elemental HERO), Zane (Cyber Dragon), Aster (Destiny HERO), Chazz (Armed Dragon) |
+| 5D's | Yusei (Synchron/Junk/Stardust), Jack (Red Dragon Archfiend), Crow (Blackwing), Akiza (Rose Dragon) |
+| ZEXAL | Yuma (Utopia), Kite (Galaxy-Eyes/Photon) |
+| ARC-V | Yuya (Performapal/Odd-Eyes) |
+| VRAINS | Playmaker (Code Talker) |
+
+The built-in bot or Claude can play any of them; with Claude, comments come in the character's voice. To use one of their decks yourself, pick them on the Auto-Build page.
+
 ### 📜 Formats (rulings)
 Pick the format per deck (in the deck builder) and per duel. It sets the banlist, deck sizes, card legality, LP, hand size and zones:
 
@@ -134,7 +148,8 @@ Plain HTML, CSS and JavaScript, with no build step. The files:
 | `js/view-*.js` | Search/Archetype, Releases/Set and Decks/Builder pages |
 | `js/app.js` | Hash router |
 | `js/formats.js` | Formats: banlists, deck sizes, LP, zones and legality |
-| `js/deckgen.js` | Auto-Build: archetype to deck |
+| `js/deckgen.js` | Auto-Build: archetype(s) and signature cards to deck |
+| `js/characters.js` | Famous duelists: archetypes, signature cards and personas |
 | `js/view-tools.js` | Auto-Build and Draw Tester pages |
 | `js/duel/engine.js` | Duel rules engine (zones, summons, phases, battle, LP) |
 | `js/duel/effects.js` | Effect reader: common effect wording to one-click resolution |

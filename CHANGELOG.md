@@ -2,6 +2,14 @@
 
 Each `## <version>` section becomes the "What's new" text shown in the app's update dialog and on the GitHub Release page.
 
+## 1.3.0
+- **Fixed:** Auto-Build and Duel bounced back to Card Search after updating the Mac app. The app had kept old copies of some files; updates now always load fresh files.
+- **Famous duelists:** pick Yugi, Kaiba, Joey, Jaden, Yusei, Jack, Crow, Yuma, Kite, Yuya, Playmaker and more as your opponent. Each plays a modern version of their deck, built from the newest support cards with their ace and signature cards.
+- Build any famous duelist's deck for yourself from the Auto-Build page.
+- When the Claude opponent plays a character, its comments are in that character's voice.
+- Smarter bot: it keeps hand traps in hand, Sets weak monsters face-down and prefers searchers.
+- The duel board fits laptop screens better.
+
 ## 1.2.0
 - **Auto-Build:** type an archetype (for example "Lunalight") and get a ready-to-play deck. It includes the archetype's starters, extenders and Extra Deck monsters plus generic staples, and explains each pick.
 - **Draw Tester:** deal test hands, draw cards, and see your odds of opening a starter, from 10,000 simulated hands. You choose which cards count as starters.

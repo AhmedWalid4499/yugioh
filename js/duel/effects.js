@@ -159,7 +159,7 @@
     }
 
     // Search
-    if ((m = /add 1 ([^.;]{1,140}?) from your deck to your hand/.exec(t)) && (kind !== 'monster' || context.summoned)) {
+    if ((m = /add 1 ([^.;]{1,140}?) from your deck(?: or (?:gy|graveyard))? to your hand/.exec(t)) && (kind !== 'monster' || context.summoned)) {
       const phrase = text.substr(m.index + 6, m[1].length);
       const match = deckMatcher(phrase);
       const pool = duel.players[p].deck.filter((x) => x.uid !== c.uid && match(x));

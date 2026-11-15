@@ -55,6 +55,15 @@ fs.mkdirSync(WEB, { recursive: true });
 ['index.html', 'css', 'js', 'vendor'].forEach((p) => copy(path.join(ROOT, p), path.join(WEB, p)));
 fs.writeFileSync(path.join(WEB, 'version.json'), JSON.stringify({ version, minAppVersion }, null, 2) + '\n');
 
+// Cache-busting: give every script and stylesheet a ?v=<version> address, so an
+// app that cached the previous version's files can never mix them with this one.
+const indexPath = path.join(WEB, 'index.html');
+const html = fs.readFileSync(indexPath, 'utf8')
+  .replace(/(<script src="(?:js|vendor)\/[^"?]+\.js)(?:\?v=[^"]*)?"/g, '$1?v=' + version + '"')
+  .replace(/(<link rel="stylesheet" href="css\/[^"?]+\.css)(?:\?v=[^"]*)?"/g, '$1?v=' + version + '"');
+if (!/\?v=/.test(html)) { console.error('Could not add version tags to index.html'); process.exit(1); }
+fs.writeFileSync(indexPath, html);
+
 const zip = new AdmZip();
 zip.addLocalFolder(WEB);
 const zipPath = path.join(DIST, 'duel-vault-web.zip');

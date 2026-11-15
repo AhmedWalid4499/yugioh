@@ -37,7 +37,14 @@ function serveFile(request) {
   const root = path.resolve(web.dir);
   const file = path.resolve(root, '.' + rel);
   if (file !== root && !file.startsWith(root + path.sep)) return new Response('Not found', { status: 404 });
-  return net.fetch(pathToFileURL(file).toString()).catch(() => new Response('Not found', { status: 404 }));
+  // Never cache app files: after an update every file must come from the new version.
+  return net.fetch(pathToFileURL(file).toString())
+    .then((res) => {
+      const headers = new Headers(res.headers);
+      headers.set('Cache-Control', 'no-store');
+      return new Response(res.body, { status: res.status, headers: headers });
+    })
+    .catch(() => new Response('Not found', { status: 404 }));
 }
 
 function createWindow() {
@@ -120,6 +127,7 @@ ipcMain.handle('dv:install', async (event) => {
   });
   resolveWeb();
   lastCheck = null;
+  await event.sender.session.clearCache();
   return { version: version, active: web.version };
 });
 

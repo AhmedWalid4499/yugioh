@@ -11,7 +11,7 @@ const ROOT = path.resolve(__dirname, '..');
 global.window = global;
 global.localStorage = { _d: {}, getItem(k) { return this._d[k] == null ? null : this._d[k]; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
 global.document = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
-['js/util.js', 'js/formats.js', 'js/api.js', 'js/insights.js', 'js/decks.js', 'js/deckgen.js', 'js/duel/engine.js', 'js/duel/effects.js', 'js/duel/bot.js', 'js/duel/claude.js']
+['js/util.js', 'js/formats.js', 'js/api.js', 'js/insights.js', 'js/decks.js', 'js/deckgen.js', 'js/characters.js', 'js/duel/engine.js', 'js/duel/effects.js', 'js/duel/bot.js', 'js/duel/claude.js']
   .forEach((f) => vm.runInThisContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }));
 const App = global.App;
 const { cards } = require('./fixtures');
@@ -72,6 +72,11 @@ function giveHand(d, p, names) {
   check(built.main.length <= 40 && built.notes.some((n) => /Only \d+ cards/.test(n)) === (built.main.length < 40), 'deck is capped at 40 and warns when the card pool is too small');
   const goat = await App.deckgen.build('Lunalight', { format: 'goat', staples: false });
   check(!goat.extra.includes(byName('Accesscode Talker').id), 'Goat build skips Link monsters');
+  const yugi = await App.characters.buildDeck('yugi', 'tcg');
+  check(yugi.name === 'Yugi\'s Deck' && yugi.main.filter((id) => id === byName('Dark Magician').id).length === 3, 'character deck: Yugi\'s ace Dark Magician gets 3 copies even though it is a Normal Monster');
+  const mixed = await App.deckgen.build('Lunalight', { format: 'tcg', archetypes: ['Lunalight', 'Snake-Eye'], signature: ['Gemini Elf'] });
+  check(mixed.main.includes(byName('Snake-Eye Ash').id) && mixed.main.includes(byName('Lunalight Yellow Marten').id) && mixed.main.includes(byName('Gemini Elf').id), 'multi-archetype decks mix both pools and include signature cards from outside them');
+  check(App.characters.list().length >= 15 && App.characters.list().every((c) => c.archetypes.length && c.signature.indexOf(c.ace) !== -1 || c.signature.length), 'every character has archetypes and signature cards');
   Object.assign(App.api, realApi);
 
   console.log('Turn structure');
@@ -199,6 +204,11 @@ function giveHand(d, p, names) {
   check(d.monsters(1).some((m) => m.card.name === 'Gemini Elf') && d.players[0].lp === 8000 - 1900, 'Claude\'s actions are applied: summon, then a direct attack (LP ' + d.players[0].lp + ')');
   check(d.log.some((l) => /💬 Here I go!/.test(l.text)) && d.active === 0, 'Claude\'s comment is logged and the turn ends');
 
+  App.ClaudeOpponent.setPersona('You are playing as Jaden Yuki.');
+  await App.ClaudeOpponent.call('x', { you: { hand: [], field: { monsters: [] } }, opponent: { field: { monsters: [] } } }).catch(() => {});
+  const withPersona = calls[calls.length - 1].body.system;
+  check(withPersona.length === 2 && /Jaden Yuki/.test(withPersona[1].text) && withPersona[0].cache_control, 'character persona is sent after the cached rules prompt');
+  App.ClaudeOpponent.setPersona(null);
   global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'invalid x-api-key' } }) });
   d.endTurn();
   await App.ClaudeOpponent.takeTurn(d, 1, noUi);

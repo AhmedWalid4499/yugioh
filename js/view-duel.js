@@ -81,15 +81,18 @@
     const mineDeck = D.get(preMine);
     const cs = App.ClaudeOpponent.settings.get();
     const deckOpts = (sel) => decks.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.name) + ' (' + d.main.length + ')</option>').join('');
-    const oppSel = last.theirs && (D.get(last.theirs) || last.theirs.indexOf('__') === 0) ? last.theirs : '__auto';
+    const oppSel = params.get('vs') ? '__char:' + params.get('vs') : last.theirs && (D.get(last.theirs) || last.theirs.indexOf('__') === 0) ? last.theirs : '__char:jaden';
+    const charOpts = App.characters.list().map((c) => '<option value="__char:' + c.id + '"' + ('__char:' + c.id === oppSel ? ' selected' : '') + '>' + esc(c.name) + ' — ' + esc(c.archetypes[0]) + '</option>').join('');
 
     view.innerHTML = '<section class="page">' +
       '<div class="page-head"><h1>Duel</h1><p class="muted">Test your deck in a practice duel against the built-in bot or a Claude AI opponent.</p></div>' +
       (decks.length ? '' : '<div class="panel"><p>You need a deck first. <a class="btn btn-primary" href="#/build">⚡ Auto-build one</a> or <a href="#/decks">create one</a>.</p></div>') +
+      '<div class="panel"><h3>Choose your opponent</h3><p class="muted small">Duel a famous duelist with a modern version of their deck (built from the newest cards in the database), or pick any deck below.</p>' +
+        App.characters.tiles(oppSel.indexOf('__char:') === 0 ? oppSel.slice(7) : null) + '</div>' +
       '<form class="panel duel-setup" id="duel-form" autocomplete="off">' +
         '<div class="setup-grid">' +
           '<label>Your deck<select name="mine" required>' + deckOpts(preMine) + '</select></label>' +
-          '<label>Opponent\'s deck<select name="theirs">' + deckOpts(oppSel) +
+          '<label>Opponent\'s deck<select name="theirs"><optgroup label="Famous duelists">' + charOpts + '</optgroup><optgroup label="Your decks">' + deckOpts(oppSel) + '</optgroup>' +
             '<option value="__auto"' + (oppSel === '__auto' ? ' selected' : '') + '>Auto-build from an archetype…</option>' +
             '<option value="__mirror"' + (oppSel === '__mirror' ? ' selected' : '') + '>Same as mine (mirror match)</option></select></label>' +
           '<label class="arch-row">Opponent\'s archetype<input name="arch" list="duel-archetypes" placeholder="e.g. Blue-Eyes" value="' + esc(last.arch || 'Blue-Eyes') + '"></label>' +
@@ -114,6 +117,15 @@
       '</form></section>';
 
     const form = U.$('#duel-form', view);
+    App.characters.paintArt(view);
+    view.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-char]');
+      if (!t) return;
+      form.theirs.value = '__char:' + t.getAttribute('data-char');
+      U.$$('.char-tile', view).forEach((x) => x.classList.toggle('selected', x === t));
+      sync();
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     api.getArchetypes().then((l) => { U.$('#duel-archetypes', view).innerHTML = l.map((a) => '<option value="' + esc(a) + '">').join(''); }).catch(() => {});
     const sync = () => {
       U.$('.arch-row', view).hidden = form.theirs.value !== '__auto';
@@ -122,6 +134,7 @@
     };
     form.addEventListener('change', (e) => {
       if (e.target.name === 'mine') { const d = D.get(form.mine.value); if (d && d.format) form.format.value = d.format; }
+      if (e.target.name === 'theirs') U.$$('.char-tile', view).forEach((x) => x.classList.toggle('selected', '__char:' + x.getAttribute('data-char') === form.theirs.value));
       sync();
     });
     sync();
@@ -155,7 +168,13 @@
     const mine = D.get(setup.mine);
     if (!mine || !mine.main.length) throw new Error('Pick a deck with Main Deck cards.');
     let theirs;
-    if (setup.theirs === '__mirror') theirs = { name: mine.name, main: mine.main, extra: mine.extra };
+    let character = null;
+    if (setup.theirs.indexOf('__char:') === 0) {
+      character = App.characters.get(setup.theirs.slice(7));
+      if (!character) throw new Error('Pick an opponent.');
+      const built = await App.characters.buildDeck(character.id, setup.format);
+      theirs = { name: built.name, main: built.main, extra: built.extra };
+    } else if (setup.theirs === '__mirror') theirs = { name: mine.name, main: mine.main, extra: mine.extra };
     else if (setup.theirs === '__auto') {
       if (!setup.arch) throw new Error('Type an archetype for your opponent.');
       const built = await App.deckgen.build(setup.arch, { format: setup.format, staples: true });
@@ -170,11 +189,15 @@
       extra: (await cardsFor(d.extra)).filter((c) => F.cardAllowed(c, fmt.key))
     });
     const meSpec = await spec(mine, 'You');
-    const oppSpec = await spec(theirs, setup.ai === 'claude' ? 'Claude' : 'Bot');
+    const oppSpec = await spec(theirs, character ? character.short : setup.ai === 'claude' ? 'Claude' : 'Bot');
+    App.ClaudeOpponent.setPersona(character && setup.ai === 'claude'
+      ? 'You are playing as ' + character.name + ' from Yu-Gi-Oh! ' + character.series + ' (' + character.persona + '). Write your one-sentence comments in that character\'s voice, using your own words rather than quoting the show.'
+      : null);
     if (meSpec.main.length < fmt.hand + 1 || oppSpec.main.length < fmt.hand + 1) throw new Error('Both decks need more cards than an opening hand.');
     let first = setup.first === 'me' ? 0 : setup.first === 'opp' ? 1 : (Math.random() < 0.5 ? 0 : 1);
     const duel = new App.Duel.Duel({ format: fmt.key, first: first, lp: Number(setup.lp) || null, decks: [meSpec, oppSpec] });
     duel.log.unshift({ turn: 0, text: (setup.first === 'coin' ? 'Coin toss: ' : '') + (first === 0 ? 'You go' : oppSpec.playerName + ' goes') + ' first. Format: ' + fmt.label + '.' });
+    if (character) duel.log.unshift({ turn: 0, text: character.name + ' steps up with ' + character.style.replace(/\.$/, '') + (setup.ai === 'claude' ? ' (played by Claude).' : ' (played by the built-in bot).') });
     if (mine.main.length < fmt.main[0]) duel.log.unshift({ turn: 0, text: 'Note: your deck is below the ' + fmt.label + ' minimum (' + fmt.main[0] + ') — fine for practice.' });
     session = { duel: duel, oppType: setup.ai, reveal: false, busy: false, status: '', resolving: null, setup: setup };
   }

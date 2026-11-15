@@ -28,6 +28,7 @@ function buildNextRelease(version) {
   const zip = new AdmZip();
   zip.addLocalFolder(web);
   zip.updateFile('version.json', Buffer.from(JSON.stringify({ version })));
+  zip.updateFile('index.html', Buffer.from(fs.readFileSync(path.join(web, 'index.html'), 'utf8').replace(/\?v=[^"]+"/g, '?v=' + version + '"')));
   zip.updateFile('js/version.js', Buffer.from(fs.readFileSync(path.join(web, 'js', 'version.js'), 'utf8').replace(/VERSION = '[^']+'/, "VERSION = '" + version + "'")));
   return zip.toBuffer();
 }
@@ -109,6 +110,8 @@ async function mockApis(app) {
   await win.waitForFunction((v) => document.getElementById('app-version').textContent.indexOf(v) !== -1, NEXT, { timeout: 15000 });
   check(true, 'one click installs the update and reloads into v' + NEXT);
   check(fs.existsSync(path.join(userData, 'web-current', 'version.json')), 'update is stored in the app data folder');
+  const fresh = await win.evaluate(() => ({ version: App.VERSION, srcs: Array.from(document.scripts).map((x) => x.getAttribute('src')).filter(Boolean) }));
+  check(fresh.version === '9.9.0' && fresh.srcs.length > 5 && fresh.srcs.every((x) => /\?v=9\.9\.0$/.test(x)), 'after updating, the app runs the new version\'s code (no stale cached files)');
 
   await win.evaluate(() => { location.hash = '#/decks'; });
   await win.waitForSelector('.deck-list');
