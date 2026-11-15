@@ -79,10 +79,8 @@
     '</section>';
 
     U.$('#new-deck', view).addEventListener('click', () => {
-      const name = prompt('Name your deck', 'New Deck');
-      if (name === null) return;
-      const deck = D.create(name.trim() || 'New Deck');
-      location.hash = '#/deck/' + deck.id;
+      const deck = D.create('New Deck');
+      location.hash = '#/deck/' + deck.id + '?new=1';
     });
     U.$('#import-toggle', view).addEventListener('click', () => {
       const p = U.$('#import-panel', view);
@@ -299,6 +297,12 @@
       U.$('#deck-stats', view).innerHTML = statsHtml(d);
     }
     renderDeck();
+    if (params.get('new')) {
+      const nameBox = U.$('#deck-name', view);
+      nameBox.focus();
+      nameBox.select();
+      U.toast('Type a name for your new deck.');
+    }
 
     const searchTile = (c) => '<div class="tile-wrap">' + C.cardTile(c) +
       '<button type="button" class="quick-add" data-quick-add="' + c.id + '" title="Add to deck" aria-label="Add ' + esc(c.name) + ' to deck">+</button></div>';

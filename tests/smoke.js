@@ -52,7 +52,7 @@ function apiResponse(url) {
 }
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   const context = await browser.newContext({ viewport: { width: 1360, height: 900 }, acceptDownloads: true });
   const page = await context.newPage();
   const errors = [];
