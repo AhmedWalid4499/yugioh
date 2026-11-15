@@ -2,6 +2,22 @@
 
 Each `## <version>` section becomes the "What's new" text shown in the app's update dialog and on the GitHub Release page.
 
+## 1.6.0
+- **New Home page:** search for a card straight away, jump to any part of the app, carry on with your decks or an unfinished duel, and challenge a duelist in one click. First-time visitors get a 3-step guide.
+- **Simpler duel setup:**
+  - Three numbered steps: your opponent, your deck, and who plays your opponent.
+  - The rest (rulings, who goes first, Life Points, your picture) is under *More options*.
+  - A bar at the bottom always shows who's duelling and has the **Start duel** button.
+- **Duel without a deck:** borrow a famous duelist's deck as your own.
+- **The duel board guides you:**
+  - A line under the turn box tells you what you can do next.
+  - Card menus show only the moves the rules allow right now. Greyed-out buttons explain why (for example "Needs 2 Tributes").
+  - Free moves for effects the app doesn't handle are under *More moves*.
+  - Manual tools and settings fold away.
+- **How to play:** a guide on the duel board (press **?**), with keyboard shortcuts: **B** Battle Phase, **M** Main Phase 2, **E** End Turn.
+- **Help page:** a guide to every page, how to duel, a list of Yu-Gi-Oh! words, and answers to common questions.
+- **My Decks:** every deck has *Test hands* and *Duel* buttons. When you have no decks, the page offers to auto-build one.
+
 ## 1.5.0
 - **Much smarter bot:**
   - Synchro, Xyz and Link Summons from its own field (checked by the same rules as yours), plus Fusion Summons with spells.

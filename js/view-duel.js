@@ -79,47 +79,63 @@
 
   function setupPage(view, params) {
     const decks = D.all();
+    const chars = App.characters.list();
     const last = U.store.get('dv-duel-setup', {});
-    const preMine = params.get('deck') || last.mine || (decks[0] && decks[0].id);
+    const oppSel = params.get('vs') ? '__char:' + params.get('vs') : last.theirs && (D.get(last.theirs) || last.theirs.indexOf('__') === 0) ? last.theirs : '__char:jaden';
+    // No deck yet? Play with a famous duelist's deck, so you can duel straight away.
+    const validMine = (v) => v && (D.get(v) || (v.indexOf('__char:') === 0 && App.characters.get(v.slice(7))));
+    const fallbackMine = decks[0] ? decks[0].id : '__char:' + (oppSel === '__char:yugi' ? 'kaiba' : 'yugi');
+    const preMine = [params.get('deck'), last.mine].find(validMine) || fallbackMine;
     const mineDeck = D.get(preMine);
     const cs = App.ClaudeOpponent.settings.get();
-    const deckOpts = (sel) => decks.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.name) + ' (' + d.main.length + ')</option>').join('');
-    const oppSel = params.get('vs') ? '__char:' + params.get('vs') : last.theirs && (D.get(last.theirs) || last.theirs.indexOf('__') === 0) ? last.theirs : '__char:jaden';
-    const charOpts = App.characters.list().map((c) => '<option value="__char:' + c.id + '"' + ('__char:' + c.id === oppSel ? ' selected' : '') + '>' + esc(c.name) + ' — ' + esc(c.archetypes[0]) + '</option>').join('');
+    const deckOpts = (sel) => decks.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.name) + ' (' + d.main.length + ' cards)</option>').join('');
+    const charOpts = (sel) => chars.map((c) => '<option value="__char:' + c.id + '"' + ('__char:' + c.id === sel ? ' selected' : '') + '>' + esc(c.name) + ' — ' + esc(c.archetypes[0]) + '</option>').join('');
+    const yourDecks = decks.length ? '<optgroup label="Your decks">' : '';
 
-    view.innerHTML = '<section class="page">' +
-      '<div class="page-head"><h1>Duel</h1><p class="muted">Test your deck in a practice duel against the built-in bot or a Claude AI opponent.</p></div>' +
-      (decks.length ? '' : '<div class="panel"><p>You need a deck first. <a class="btn btn-primary" href="#/build">⚡ Auto-build one</a> or <a href="#/decks">create one</a>.</p></div>') +
-      '<div class="panel you-pic"><div class="row">' + App.characters.avatar('you', 'big') + '<div><strong>Your picture</strong><p class="muted small">Shown next to your name in duels. Saved on this device only.</p>' +
-        '<label class="btn btn-small">📷 Choose a picture<input type="file" accept="image/*" data-portrait="you" hidden></label>' +
-        (App.characters.portrait('you') ? ' <button type="button" class="btn btn-small btn-ghost" data-portrait-clear="you">Remove</button>' : '') + '</div></div></div>' +
-      '<div class="panel"><h3>Choose your opponent</h3><p class="muted small">Duel a famous duelist with a modern version of their deck (built from the newest cards in the database), or pick any deck below.</p>' +
-        App.characters.tiles(oppSel.indexOf('__char:') === 0 ? oppSel.slice(7) : null) + '</div>' +
-      '<form class="panel duel-setup" id="duel-form" autocomplete="off">' +
-        '<div class="setup-grid">' +
-          '<label>Your deck<select name="mine" required>' + deckOpts(preMine) + '</select></label>' +
-          '<label>Opponent\'s deck<select name="theirs"><optgroup label="Famous duelists">' + charOpts + '</optgroup><optgroup label="Your decks">' + deckOpts(oppSel) + '</optgroup>' +
-            '<option value="__auto"' + (oppSel === '__auto' ? ' selected' : '') + '>Auto-build from an archetype…</option>' +
-            '<option value="__mirror"' + (oppSel === '__mirror' ? ' selected' : '') + '>Same as mine (mirror match)</option></select></label>' +
+    view.innerHTML = '<section class="page duel-setup-page">' +
+      '<div class="page-head"><h1>Duel</h1><p class="muted">Practise against a famous duelist. Pick your opponent and your deck, then press <strong>Start duel</strong>. Everything else is optional.</p></div>' +
+      '<form id="duel-form" autocomplete="off">' +
+      '<div class="panel"><h3><span class="step-num">1</span> Choose your opponent</h3>' +
+        '<p class="muted small">Each duelist plays a modern version of their deck, built from the newest cards.</p>' +
+        App.characters.tiles(oppSel.indexOf('__char:') === 0 ? oppSel.slice(7) : null) +
+        '<div class="setup-grid more-opp">' +
+          '<label>Or play against<select name="theirs"><optgroup label="Famous duelists">' + charOpts(oppSel) + '</optgroup>' + (decks.length ? '<optgroup label="Your decks">' + deckOpts(oppSel) + '</optgroup>' : '') +
+            '<option value="__auto"' + (oppSel === '__auto' ? ' selected' : '') + '>A deck auto-built from an archetype…</option>' +
+            '<option value="__mirror"' + (oppSel === '__mirror' ? ' selected' : '') + '>The same deck as mine (mirror match)</option></select></label>' +
           '<label class="arch-row">Opponent\'s archetype<input name="arch" list="duel-archetypes" placeholder="e.g. Blue-Eyes" value="' + esc(last.arch || 'Blue-Eyes') + '"></label>' +
+        '</div></div>' +
+      '<div class="panel"><h3><span class="step-num">2</span> Choose your deck</h3>' +
+        '<div class="setup-grid"><label>Your deck<select name="mine" required>' + (decks.length ? yourDecks + deckOpts(preMine) + '</optgroup>' : '') +
+          '<optgroup label="Play with a famous duelist\'s deck">' + charOpts(preMine) + '</optgroup></select></label></div>' +
+        '<p class="muted small">' + (decks.length ? 'Want a new deck? <a href="#/build">⚡ Auto-build one</a> in one click.' : 'No deck of your own yet? Borrow a famous duelist\'s deck above, or <a href="#/build">⚡ auto-build your own</a> in one click.') + '</p>' +
+      '</div>' +
+      '<div class="panel"><h3><span class="step-num">3</span> Who plays your opponent?</h3>' +
+        '<div class="choice-cards">' +
+          '<label class="choice-card"><input type="radio" name="ai" value="bot"' + (last.ai !== 'claude' ? ' checked' : '') + '><span><strong>🤖 Built-in bot</strong><span class="muted small">Free and works offline. Summons, chains hand traps and attacks by the rules.</span></span></label>' +
+          '<label class="choice-card"><input type="radio" name="ai" value="claude"' + (last.ai === 'claude' ? ' checked' : '') + '><span><strong>✦ Claude AI</strong><span class="muted small">Reads every card and plays like a person. Needs your Anthropic API key (paid per use).</span></span></label>' +
+        '</div>' +
+        '<div class="claude-settings">' +
+          '<label>Anthropic API key<input type="password" name="key" placeholder="sk-ant-…" value="' + esc(cs.apiKey) + '" autocomplete="off"></label>' +
+          '<label>Model<select name="model">' + App.ClaudeOpponent.MODELS.map((m) => '<option value="' + m.id + '"' + (m.id === cs.model ? ' selected' : '') + '>' + esc(m.label) + '</option>').join('') + '</select></label>' +
+          '<label>Thinking<select name="effort"><option value="">Balanced (default)</option><option value="low"' + (cs.effort === 'low' ? ' selected' : '') + '>Faster turns</option><option value="high"' + (cs.effort === 'high' ? ' selected' : '') + '>Deeper thinking (slower)</option></select></label>' +
+          '<p class="muted small">The key is saved only on this device and sent only to api.anthropic.com. Get one at console.anthropic.com.</p>' +
+        '</div>' +
+      '</div>' +
+      '<details class="panel more-options"' + (last.format && last.format !== 'tcg' || last.lp ? ' open' : '') + '><summary>More options <span class="muted small">rulings, who goes first, Life Points, your picture</span></summary>' +
+        '<div class="setup-grid">' +
           '<label>Rulings / format<select name="format">' + F.options(last.format || (mineDeck && mineDeck.format) || 'tcg') + '</select></label>' +
           '<label>Who goes first<select name="first"><option value="coin">Coin toss</option><option value="me"' + (last.first === 'me' ? ' selected' : '') + '>Me</option><option value="opp"' + (last.first === 'opp' ? ' selected' : '') + '>Opponent</option></select></label>' +
-          '<label>Starting LP<input type="number" name="lp" min="100" step="100" placeholder="Format default" value="' + esc(last.lp || '') + '"></label>' +
+          '<label>Starting Life Points<input type="number" name="lp" min="100" step="100" placeholder="Format default" value="' + esc(last.lp || '') + '"></label>' +
         '</div>' +
         '<p class="muted small" id="fmt-desc"></p>' +
-        '<fieldset class="opp-type"><legend>Opponent</legend>' +
-          '<label class="check"><input type="radio" name="ai" value="bot"' + (last.ai !== 'claude' ? ' checked' : '') + '> <span><strong>Built-in bot</strong>: free and offline. It summons, sets and attacks by the rules and uses common effects (draw, destroy, search, revive, burn, Fusion).</span></label>' +
-          '<label class="check"><input type="radio" name="ai" value="claude"' + (last.ai === 'claude' ? ' checked' : '') + '> <span><strong>Claude AI</strong>: reads every card\'s text and plays its deck like a person. Needs your Anthropic API key, which is billed per use.</span></label>' +
-          '<div class="claude-settings">' +
-            '<label>Anthropic API key<input type="password" name="key" placeholder="sk-ant-…" value="' + esc(cs.apiKey) + '" autocomplete="off"></label>' +
-            '<label>Model<select name="model">' + App.ClaudeOpponent.MODELS.map((m) => '<option value="' + m.id + '"' + (m.id === cs.model ? ' selected' : '') + '>' + esc(m.label) + '</option>').join('') + '</select></label>' +
-            '<label>Thinking<select name="effort"><option value="">Balanced (default)</option><option value="low"' + (cs.effort === 'low' ? ' selected' : '') + '>Faster turns</option><option value="high"' + (cs.effort === 'high' ? ' selected' : '') + '>Deeper thinking (slower)</option></select></label>' +
-            '<p class="muted small">The key is saved only on this device and sent only to api.anthropic.com. Get one at console.anthropic.com. Costs are rough estimates.</p>' +
-          '</div>' +
-        '</fieldset>' +
-        '<div class="row"><button class="btn btn-primary" type="submit"' + (decks.length ? '' : ' disabled') + '>⚔ Start duel</button><span id="duel-setup-status" class="muted"></span></div>' +
-        '<details class="small"><summary>What\'s automated?</summary><p class="muted">Turn and phase order, drawing, Normal and Tribute Summons, Sets, when Spells and Traps can be activated, position changes, battle, damage, LP and win conditions. Common effects resolve with one click. For anything more complex, use the card menus to move cards, change LP or summon. The Claude opponent resolves its own effects.</p></details>' +
-        '<datalist id="duel-archetypes"></datalist>' +
+        '<div class="you-pic"><div class="row">' + App.characters.avatar('you', 'big') + '<div><strong>Your picture</strong><p class="muted small">Shown next to your name in duels. Saved on this device only.</p>' +
+          '<label class="btn btn-small">📷 Choose a picture<input type="file" accept="image/*" data-portrait="you" hidden></label>' +
+          (App.characters.portrait('you') ? ' <button type="button" class="btn btn-small btn-ghost" data-portrait-clear="you">Remove</button>' : '') + '</div></div></div>' +
+        '<p class="muted small">Automated for you: turn and phase order, drawing, summons and Tributes, Spell and Trap timing, chains, battle, damage and win conditions. Common card effects resolve with one click.</p>' +
+      '</details>' +
+      '<div class="start-bar"><div class="start-summary" id="start-summary"></div>' +
+        '<button class="btn btn-primary btn-big" type="submit">⚔ Start duel</button><span id="duel-setup-status" class="muted small" role="status"></span></div>' +
+      '<datalist id="duel-archetypes"></datalist>' +
       '</form></section>';
 
     const form = U.$('#duel-form', view);
@@ -131,36 +147,51 @@
       form.theirs.value = '__char:' + t.getAttribute('data-char');
       U.$$('.char-tile', view).forEach((x) => x.classList.toggle('selected', x === t));
       sync();
-      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     api.getArchetypes().then((l) => { U.$('#duel-archetypes', view).innerHTML = l.map((a) => '<option value="' + esc(a) + '">').join(''); }).catch(() => {});
+    const deckLabel = (v, arch) => {
+      if (v.indexOf('__char:') === 0) { const c = App.characters.get(v.slice(7)); return c ? c.short + '\'s ' + c.archetypes[0] + ' deck' : ''; }
+      if (v === '__auto') return (arch || 'an archetype') + ' deck';
+      if (v === '__mirror') return 'your own deck';
+      const d = D.get(v); return d ? d.name : '';
+    };
     const sync = () => {
       U.$('.arch-row', view).hidden = form.theirs.value !== '__auto';
       U.$('.claude-settings', view).hidden = form.ai.value !== 'claude';
       U.$('#fmt-desc', view).textContent = F.get(form.format.value).description;
+      const t = form.theirs.value;
+      const ch = t.indexOf('__char:') === 0 ? App.characters.get(t.slice(7)) : null;
+      U.$('#start-summary', view).innerHTML = App.characters.avatar('you') + '<span><strong>You</strong><span class="muted small">' + esc(deckLabel(form.mine.value)) + '</span></span>' +
+        '<span class="vs">VS</span>' + (ch ? App.characters.avatar(ch.id) : '<span class="avatar avatar-you">' + (form.ai.value === 'claude' ? '✦' : '🤖') + '</span>') +
+        '<span><strong>' + esc(ch ? ch.short : form.ai.value === 'claude' ? 'Claude' : 'Bot') + '</strong><span class="muted small">' + esc(deckLabel(t, form.arch.value.trim())) + ' · ' + esc(F.get(form.format.value).short) + '</span></span>';
+      App.characters.paintArt(U.$('#start-summary', view));
     };
     form.addEventListener('change', (e) => {
       if (e.target.name === 'mine') { const d = D.get(form.mine.value); if (d && d.format) form.format.value = d.format; }
       if (e.target.name === 'theirs') U.$$('.char-tile', view).forEach((x) => x.classList.toggle('selected', '__char:' + x.getAttribute('data-char') === form.theirs.value));
       sync();
     });
+    form.addEventListener('input', (e) => { if (e.target.name === 'arch') sync(); });
     sync();
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const status = U.$('#duel-setup-status', view);
+      const btn = U.$('button[type=submit]', form);
       const setup = { mine: form.mine.value, theirs: form.theirs.value, arch: form.arch.value.trim(), format: form.format.value, first: form.first.value, lp: form.lp.value, ai: form.ai.value };
       U.store.set('dv-duel-setup', setup);
       if (setup.ai === 'claude') {
         App.ClaudeOpponent.settings.set({ apiKey: form.key.value.trim(), model: form.model.value, effort: form.effort.value });
-        if (!form.key.value.trim()) { status.textContent = 'Enter your Anthropic API key to play against Claude, or pick the built-in bot.'; return; }
+        if (!form.key.value.trim()) { status.textContent = 'Enter your Anthropic API key in step 3, or pick the built-in bot.'; form.key.focus(); return; }
       }
-      status.textContent = 'Shuffling decks…';
+      status.textContent = 'Building decks and shuffling… this can take a few seconds.';
+      btn.disabled = true;
       try {
         await start(setup);
         location.hash = '#/duel/play';
       } catch (err) {
         status.textContent = err.message;
+        btn.disabled = false;
       }
     });
   }
@@ -172,7 +203,11 @@
   }
 
   async function start(setup) {
-    const mine = D.get(setup.mine);
+    let mine = D.get(setup.mine);
+    if (setup.mine && setup.mine.indexOf('__char:') === 0) {
+      const me = App.characters.get(setup.mine.slice(7));
+      if (me) { const built = await App.characters.buildDeck(me.id, setup.format); mine = { name: built.name, main: built.main, extra: built.extra }; }
+    }
     if (!mine || !mine.main.length) throw new Error('Pick a deck with Main Deck cards.');
     let theirs;
     let character = null;
@@ -232,6 +267,7 @@
       processFlips: () => processFlips()
     };
     s.ui = ui;
+    s.open = s.open || {};
 
     view.innerHTML = '<section class="page duel-page"><div id="duel-root"></div></section>';
     const root = U.$('#duel-root', view);
@@ -308,6 +344,26 @@
       }).join('') + '</div>';
     }
 
+    /* One plain-English line telling you what you can do right now. */
+    function guide() {
+      if (duel.winner != null) return duel.winner === 0 ? 'You won! Press Rematch to play again.' : 'Duel over. Press Rematch to try again.';
+      if (s.resolving) return 'Finish the effect of ' + s.resolving.name + ' with the card menus, then press Done.';
+      if (duel.active !== 0) return duel.pname(1) + ' is taking their turn. If you can respond with a card, you will be asked.';
+      if (s.busy) return 'Resolving…';
+      const ph = duel.phase;
+      const handPlays = duel.players[0].hand.filter((c) => hintFor(c, 'hand')).length;
+      if (ph === 'main1') {
+        const next = duel.canEnterBattle() ? 'press ⚔ Battle Phase to attack' : 'press End Turn (nobody can attack on the very first turn)';
+        return (handPlays ? 'Main Phase: click a glowing card in your hand to play it (or drag it onto the field). ' : 'Main Phase: set up your field. ') + 'When you are ready, ' + next + '.';
+      }
+      if (ph === 'battle') {
+        const ready = duel.monsters(0).filter((c) => c.faceUp && c.pos === 'atk' && !c.attacked).length;
+        return ready ? 'Battle Phase: click a glowing monster to attack (or drag it onto a target). Then press Main Phase 2 or End Turn.' : 'Battle Phase: no monster can attack now. Press Main Phase 2 or End Turn.';
+      }
+      if (ph === 'main2') return 'Main Phase 2: play or Set more cards, then press End Turn.';
+      return '';
+    }
+
     function render() {
       const myTurn = duel.active === 0;
       const ph = duel.phase;
@@ -321,7 +377,8 @@
           '</div>' +
           '<aside class="duel-side">' +
             '<div class="preview" id="card-preview">' + previewHtml(s.previewUid) + '</div>' +
-            '<div class="turn-box"><div><strong>Turn ' + duel.turn + '</strong> · ' + (myTurn ? 'Your turn' : esc(duel.pname(1)) + '\'s turn') + '</div>' +
+            '<div class="turn-box"><div class="row-between"><div><strong>Turn ' + duel.turn + '</strong> · ' + (myTurn ? 'Your turn' : esc(duel.pname(1)) + '\'s turn') + '</div><button type="button" class="btn btn-small btn-ghost" data-tool="help" title="How to play (shortcut: ?)">❓ How to play</button></div>' +
+              '<p class="guide" id="duel-guide">' + esc(guide()) + '</p>' +
               '<div class="phases">' + ['main1', 'battle', 'main2', 'end'].map((x) => '<span class="' + (x === ph ? 'on' : '') + '">' + App.Duel.PHASE_LABEL[x].replace(' Phase', '').replace('Main ', 'M') + '</span>').join('') + '</div>' +
               (s.resolving ? '<div class="resolving">Resolving <strong>' + esc(s.resolving.name) + '</strong>: use the card menus for its effect, then <button type="button" class="btn btn-small btn-primary" id="resolve-done">Done</button></div>' : '') +
               '<div class="row">' +
@@ -332,21 +389,24 @@
               '<div id="duel-status" class="muted small">' + esc(s.status || (!myTurn && duel.winner == null ? duel.pname(1) + ' is playing…' : '')) + '</div>' +
             '</div>' +
             '<div class="tools">' +
+              '<button type="button" class="btn btn-small btn-ghost" data-tool="new">New duel</button>' +
+              (duel.winner == null ? '<button type="button" class="btn btn-small btn-danger" data-tool="surrender">🏳 Surrender</button>' : '') +
+            '</div>' +
+            '<details class="side-box" data-keep="tools"' + (s.open.tools ? ' open' : '') + '><summary>🛠 Manual tools <span class="muted small">for effects the app doesn\'t handle</span></summary><div class="tools">' +
               '<button type="button" class="btn btn-small" data-tool="draw">Draw 1</button>' +
               '<button type="button" class="btn btn-small" data-tool="search">Search Deck</button>' +
               '<button type="button" class="btn btn-small" data-tool="shuffle">Shuffle</button>' +
               '<button type="button" class="btn btn-small" data-tool="lp">Change LP</button>' +
               '<button type="button" class="btn btn-small" data-tool="reveal">' + (s.reveal ? 'Hide' : 'Reveal') + ' opponent\'s hand</button>' +
-              '<button type="button" class="btn btn-small btn-ghost" data-tool="new">New duel</button>' +
-              (duel.winner == null ? '<button type="button" class="btn btn-small btn-danger" data-tool="surrender">🏳 Surrender</button>' : '') +
-            '</div>' +
+            '</div></details>' +
+            '<details class="side-box" data-keep="settings"' + (s.open.settings ? ' open' : '') + '><summary>⚙ Settings</summary>' +
             '<div class="duel-settings">' +
               '<label>Ask me to respond <select id="set-respond"><option value="auto"' + (U.store.get('dv-respond', 'auto') === 'auto' ? ' selected' : '') + '>When I can</option><option value="always"' + (U.store.get('dv-respond', 'auto') === 'always' ? ' selected' : '') + '>Always</option><option value="never"' + (U.store.get('dv-respond', 'auto') === 'never' ? ' selected' : '') + '>Never</option></select></label>' +
               '<label>Duel speed <select id="set-speed"><option value="slow"' + (speed === 800 ? ' selected' : '') + '>Slow</option><option value="normal"' + (speed === 450 ? ' selected' : '') + '>Normal</option><option value="fast"' + (speed <= 150 ? ' selected' : '') + '>Fast</option></select></label>' +
             '</div>' +
             '<div class="sound-box"><button type="button" class="btn btn-small" data-tool="sound" aria-pressed="' + App.sound.isOn() + '">' + (App.sound.isOn() ? '🔊 Sound on' : '🔇 Sound off') + '</button>' +
               '<input type="range" id="sound-vol" min="0" max="1" step="0.05" value="' + App.sound.volume() + '" aria-label="Volume"' + (App.sound.isOn() ? '' : ' disabled') + '></div>' +
-            '<p class="muted small tip">Tip: drag cards from your hand onto a zone to play them, drag a monster onto an opponent\'s monster (or their LP) to attack, or onto your GY to send it there.</p>' +
+            '</details>' +
             '<ol class="duel-log" id="duel-log">' + logHtml + '</ol>' +
           '</aside>' +
         '</div>' +
@@ -880,51 +940,80 @@
       const k = duel.kind(c);
       const main = duel.active === 0 && duel.isMain() && !s.busy;
       const acts = [];
-      const add = (label, fn, primary) => acts.push({ label: label, fn: fn, primary: primary });
+      /* primary: the main button. why: greyed out, with the reason shown. manual: a free move under "More moves". */
+      const add = (label, fn, primary, why) => acts.push({ label: label, fn: fn, primary: primary && !why, why: why || '' });
+      const manual = (label, fn) => acts.push({ label: label, fn: fn, manual: true });
+      const myTurn = duel.active === 0 && !s.busy;
+      const desc = c.data.desc || '';
       const moveSet = (exclude) => {
-        if (exclude.indexOf('hand') === -1) add('Add to hand', () => duel.sendTo(c.uid, 'hand'));
-        if (exclude.indexOf('gy') === -1) add(loc.zone === 'hand' ? 'Discard / send to GY' : 'Send to GY', () => duel.sendTo(c.uid, 'gy'));
-        if (exclude.indexOf('banished') === -1) add('Banish', () => duel.sendTo(c.uid, 'banished'));
-        if (exclude.indexOf('deck') === -1) add(duel.isExtra(c) ? 'Return to Extra Deck' : 'Shuffle into Deck', () => duel.sendTo(c.uid, 'deck'));
-        if (exclude.indexOf('deck') === -1 && !duel.isExtra(c)) add('Put on top of Deck', () => duel.sendTo(c.uid, 'deckTop'));
+        if (exclude.indexOf('hand') === -1) manual('Add to hand', () => duel.sendTo(c.uid, 'hand'));
+        if (exclude.indexOf('gy') === -1) manual(loc.zone === 'hand' ? 'Discard / send to GY' : 'Send to GY', () => duel.sendTo(c.uid, 'gy'));
+        if (exclude.indexOf('banished') === -1) manual('Banish', () => duel.sendTo(c.uid, 'banished'));
+        if (exclude.indexOf('deck') === -1) manual(duel.isExtra(c) ? 'Return to Extra Deck' : 'Shuffle into Deck', () => duel.sendTo(c.uid, 'deck'));
+        if (exclude.indexOf('deck') === -1 && !duel.isExtra(c)) manual('Put on top of Deck', () => duel.sendTo(c.uid, 'deckTop'));
       };
+      const specialManual = (label) => manual(label, async () => { const pos = await ask('Position', '', [{ label: 'Attack', value: 'atk', primary: true }, { label: 'Defense', value: 'def' }]); if (pos) { const r = duel.specialSummon(0, c.uid, pos, { how: 'effect' }); if (!r.ok) U.toast(r.message); } });
       if (loc.zone === 'hand') {
         if (k === 'monster') {
-          if (main) { add('Normal Summon', () => summonFlow(c, 'atk'), true); add('Set (face-down)', () => summonFlow(c, 'set')); }
-          add('Special Summon (by an effect)', async () => { const pos = await ask('Position', '', [{ label: 'Attack', value: 'atk', primary: true }, { label: 'Defense', value: 'def' }]); if (pos) { const r = duel.specialSummon(0, c.uid, pos, { how: 'effect' }); if (!r.ok) U.toast(r.message); } });
-          add('Activate effect from hand', () => monsterEffectFlow(c));
+          const need = duel.tributesNeeded(c);
+          const have = duel.monsters(0).length;
+          const why = duel.active !== 0 ? 'Only on your turn.' : !duel.isMain() ? 'Only in your Main Phase.' : duel.players[0].normalSummoned ? 'You already Normal Summoned or Set a monster this turn.' :
+            need > have ? 'Needs ' + need + ' Tribute' + (need > 1 ? 's' : '') + ': you control ' + (have || 'no') + ' monster' + (have === 1 ? '' : 's') + '.' : '';
+          add(need ? 'Tribute Summon' : 'Normal Summon', () => summonFlow(c, 'atk'), true, why);
+          add('Set (face-down)', () => summonFlow(c, 'set'), false, why);
+          if (/(from|in) your hand|discard this card|reveal this card|special summon this card/i.test(desc)) add('Activate effect from hand', () => monsterEffectFlow(c));
+          else manual('Activate effect from hand', () => monsterEffectFlow(c));
+          specialManual('Special Summon (by an effect)');
+        } else if (k === 'spell') {
+          const quick = /Quick-Play/.test(c.data.race || '');
+          add('Activate', () => activateFlow(c.uid), true, duel.active !== 0 && !quick ? 'Only on your turn.' : !main && !quick ? 'Only in your Main Phase.' : '');
+          add('Set', () => { const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); }, false, main ? '' : 'Only in your Main Phase.');
         } else {
-          add('Activate', () => activateFlow(c.uid), true);
-          if (main) add('Set', () => { const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); });
+          add('Set', () => { const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); }, true, main ? '' : 'Only in your Main Phase.');
+          if (/activate this card from your hand/i.test(desc)) add('Activate', () => activateFlow(c.uid));
+          else manual('Activate from hand', () => activateFlow(c.uid));
         }
         moveSet(['hand']);
       } else if (loc.zone === 'mz' || loc.zone === 'emz') {
-        if (duel.active === 0 && duel.phase === 'battle') add('Attack', () => attackFlow(c), true);
+        if (myTurn && duel.phase === 'battle') add('Attack', () => attackFlow(c), true, !c.faceUp || c.pos !== 'atk' ? 'Only face-up Attack Position monsters can attack.' : c.attacked ? 'This monster already attacked this turn.' : '');
         if (main) add(c.faceUp ? 'Change battle position' : 'Flip Summon', async () => { const wasDown = !c.faceUp; const r = duel.changePosition(0, c.uid); if (!r.ok) { U.toast(r.message); return; } if (wasDown) { await opponentRespondsToSummon(c); await processFlips(); } });
-        add('Activate effect', () => monsterEffectFlow(c));
-        add('Change ATK', () => modifyAtk(c));
-        add('Destroy', () => duel.destroy(c.uid, 'you'));
-        add('Turn face-down', () => duel.applyOp(0, { op: 'flip_face_down', card: c.uid }));
+        if (c.faceUp && /effect/i.test(c.data.type || '')) add('Activate effect', () => monsterEffectFlow(c));
+        else manual('Activate effect', () => monsterEffectFlow(c));
+        manual('Change ATK', () => modifyAtk(c));
+        manual('Destroy', () => duel.destroy(c.uid, 'you'));
+        manual('Turn face-down', () => duel.applyOp(0, { op: 'flip_face_down', card: c.uid }));
         moveSet(['gy']);
       } else if (loc.zone === 'st' || loc.zone === 'field') {
-        if (!c.faceUp) add('Activate', () => activateFlow(c.uid), true);
-        else add('Activate effect', async () => { if (!(await oncePerTurnOk(c))) return; duel.say('You activate ' + c.name + '\'s effect.', 0); duel.markUsed(0, c); const pf = App.Effects.plan(duel, 0, c); if (await negatedByOpponent(c, pf, true)) return; await resolveEffect(c, pf, false); });
-        add('Destroy', () => duel.destroy(c.uid, 'you'));
+        if (!c.faceUp) {
+          const tooSoon = duel.kind(c) === 'trap' && c.setTurn != null && c.setTurn >= duel.turn;
+          add('Activate', () => activateFlow(c.uid), true, tooSoon ? 'A Trap can\'t be activated the turn it was Set.' : '');
+        } else add('Activate effect', async () => { if (!(await oncePerTurnOk(c))) return; duel.say('You activate ' + c.name + '\'s effect.', 0); duel.markUsed(0, c); const pf = App.Effects.plan(duel, 0, c); if (await negatedByOpponent(c, pf, true)) return; await resolveEffect(c, pf, false); });
+        manual('Destroy', () => duel.destroy(c.uid, 'you'));
         moveSet(['gy']);
       } else if (loc.zone === 'extra') {
-        add('Summon from the Extra Deck', () => extraSummonFlow(c), true);
-        add('Send to GY', () => duel.sendTo(c.uid, 'gy'));
-        add('Banish', () => duel.sendTo(c.uid, 'banished'));
+        add('Summon from the Extra Deck', () => extraSummonFlow(c), true, main ? '' : 'Only in your Main Phase.');
+        manual('Send to GY', () => duel.sendTo(c.uid, 'gy'));
+        manual('Banish', () => duel.sendTo(c.uid, 'banished'));
       } else {
         // gy, banished, deck
-        if (loc.zone === 'gy' && /(in your gy|from your gy|this card is in your (gy|graveyard)|banish this card from your gy)/i.test(c.data.desc || '')) add('Activate its effect in the GY', () => monsterEffectFlow(c), true);
-        if (k === 'monster' && !duel.isExtra(c)) add('Special Summon', async () => { const pos = await ask('Position', '', [{ label: 'Attack', value: 'atk', primary: true }, { label: 'Defense', value: 'def' }]); if (pos) { const r = duel.specialSummon(0, c.uid, pos, { how: 'effect' }); if (!r.ok) U.toast(r.message); } }, true);
-        if (k === 'monster' && duel.isExtra(c) && loc.zone !== 'deck') add('Special Summon', () => duel.specialSummon(0, c.uid, 'atk', { how: 'effect' }), true);
-        if (k !== 'monster' && loc.zone !== 'deck') add('Set it on the field', () => { duel.sendTo(c.uid, 'hand', false); const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); });
+        if (loc.zone === 'gy' && /(in your gy|from your gy|this card is in your (gy|graveyard)|banish this card from your gy)/i.test(desc)) add('Activate its effect in the GY', () => monsterEffectFlow(c), true);
+        if (k === 'monster' && !duel.isExtra(c)) specialManual('Special Summon');
+        if (k === 'monster' && duel.isExtra(c) && loc.zone !== 'deck') manual('Special Summon', () => duel.specialSummon(0, c.uid, 'atk', { how: 'effect' }));
+        if (k !== 'monster' && loc.zone !== 'deck') manual('Set it on the field', () => { duel.sendTo(c.uid, 'hand', false); const r = duel.setSpellTrap(0, c.uid); if (!r.ok) U.toast(r.message); });
         moveSet([loc.zone === 'banished' ? 'banished' : loc.zone === 'deck' ? 'deck' : 'gy']);
         if (loc.zone === 'deck') acts.forEach((a) => { const fn = a.fn; a.fn = async () => { await fn(); duel.applyOp(0, { op: 'shuffle_deck' }); }; });
       }
       return acts;
+    }
+
+    function menuButtons(acts) {
+      const btn = (a) => '<button type="button" class="btn' + (a.primary ? ' btn-primary' : '') + '" data-a="' + acts.indexOf(a) + '"' + (a.why ? ' disabled title="' + esc(a.why) + '"' : '') + '>' + esc(a.label) + '</button>';
+      const rules = acts.filter((a) => !a.manual);
+      const free = acts.filter((a) => a.manual);
+      const reasons = rules.filter((a) => a.why).reduce((m, a) => (m.indexOf(a.why) === -1 ? m.concat(a.why) : m), []);
+      return (rules.length ? '<div class="menu-actions">' + rules.map(btn).join('') + '</div>' : '<p class="muted small">Nothing to do with this card by the rules right now.</p>') +
+        (reasons.length ? '<p class="why small">' + reasons.map(esc).join(' ') + '</p>' : '') +
+        (free.length ? '<details class="manual-moves"' + (rules.some((a) => !a.why) ? '' : ' open') + '><summary>More moves <span class="muted small">(manual: for card effects the app doesn\'t handle)</span></summary><div class="menu-actions">' + free.map(btn).join('') + '</div></details>' : '');
     }
 
     async function openMenu(uid) {
@@ -944,8 +1033,8 @@
         (duel.kind(c) === 'monster' ? '<div class="stat-line">' + esc(api.statLine(Object.assign({}, c.data, { atk: duel.atk(c), def: duel.def(c) }))) + '</div>' : '') +
         '<div class="muted small">' + zoneName + (c.faceUp === false ? ' · face-down' : '') + '</div>' +
         '<div class="card-text small">' + descHtml(c) + '</div></div></div>' +
-        '<div class="menu-actions">' + acts.map((a, i) => '<button type="button" class="btn' + (a.primary ? ' btn-primary' : '') + '" data-a="' + i + '">' + esc(a.label) + '</button>').join('') + '</div>',
-        (body, done) => body.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b) done(Number(b.getAttribute('data-a'))); }));
+        menuButtons(acts),
+        (body, done) => body.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b && !b.disabled) done(Number(b.getAttribute('data-a'))); }));
       if (pick == null) return;
       await acts[pick].fn();
       render();
@@ -972,6 +1061,23 @@
     }
 
     root.addEventListener('input', (e) => { if (e.target.id === 'sound-vol') App.sound.setVolume(e.target.value); });
+    // Remember which side boxes are open: the board re-renders after every play.
+    root.addEventListener('toggle', (e) => { const k = e.target.getAttribute && e.target.getAttribute('data-keep'); if (k) s.open[k] = e.target.open; }, true);
+
+    function showHelp() { C.openModal('<div class="help-modal"><h2 id="modal-title">How to play</h2>' + App.help.duelHtml() + '</div>'); }
+
+    /* Keyboard shortcuts: B = Battle Phase, M = Main Phase 2, E = End Turn, ? = How to play. */
+    const onKey = (e) => {
+      if (!document.body.contains(root)) { document.removeEventListener('keydown', onKey); return; }
+      if (!document.getElementById('modal').hidden || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === '?') { showHelp(); return; }
+      if (duel.active !== 0 || duel.winner != null || s.busy || s.resolving) return;
+      const key = e.key.toLowerCase();
+      if (key === 'b' && duel.phase === 'main1' && duel.canEnterBattle()) duel.nextPhase();
+      else if (key === 'm' && duel.phase === 'battle') duel.nextPhase();
+      else if (key === 'e') endTurn();
+    };
+    document.addEventListener('keydown', onKey);
     root.addEventListener('change', (e) => {
       if (e.target.id === 'set-respond') U.store.set('dv-respond', e.target.value);
       if (e.target.id === 'set-speed') { U.store.set('dv-duel-speed', e.target.value); speed = SPEEDS[e.target.value]; }
@@ -997,6 +1103,7 @@
         if (what === 'lp') await changeLp();
         if (what === 'reveal') s.reveal = !s.reveal;
         if (what === 'sound') App.sound.toggle();
+        if (what === 'help') { showHelp(); return; }
         if (what === 'surrender') {
           const sure = await ask('Surrender?', '<p>You will lose this duel.</p>', [{ label: 'Keep playing', value: false, primary: true }, { label: 'Surrender', value: true }]);
           if (sure) duel.surrender(0);
