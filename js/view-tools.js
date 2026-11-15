@@ -27,8 +27,10 @@
         '</div>' +
         '<datalist id="ab-archetypes"></datalist>' +
       '</form>' +
+      '<div class="panel"><h3>Or build a famous duelist\'s deck</h3><p class="muted small">Their archetypes and signature cards, built with the newest support in the database.</p>' + App.characters.tiles() + '</div>' +
       '<div id="ab-result"></div>' +
     '</section>';
+    App.characters.paintArt(view);
 
     api.getArchetypes().then((list) => {
       U.$('#ab-archetypes', view).innerHTML = list.map((x) => '<option value="' + esc(x) + '">').join('');
@@ -38,14 +40,17 @@
     const out = U.$('#ab-result', view);
     let result = null;
 
+    let character = null;
     async function run() {
       const opts = { format: form.format.value, staples: form.staples.checked };
       const input = form.a.value.trim();
       if (!input) return;
+      const ch = character && character.name === input ? character : null;
+      if (ch) Object.assign(opts, { archetypes: ch.archetypes, signature: ch.signature, name: ch.short + '\'s Deck' });
       U.store.set('dv-autobuild', { a: input, format: opts.format, staples: opts.staples });
-      out.innerHTML = C.loading('Building a ' + input + ' deck…');
+      out.innerHTML = C.loading('Building ' + (ch ? ch.short + '\'s' : 'a ' + input) + ' deck…');
       try {
-        result = await App.deckgen.build(input, opts);
+        result = await App.deckgen.build(ch ? ch.archetypes[0] : input, opts);
         render();
       } catch (e) {
         out.innerHTML = C.error(e);
@@ -95,6 +100,15 @@
     }
 
     form.addEventListener('submit', (e) => { e.preventDefault(); run(); });
+    view.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-char]');
+      if (!t) return;
+      character = App.characters.get(t.getAttribute('data-char'));
+      U.$$('.char-tile', view).forEach((x) => x.classList.toggle('selected', x === t));
+      form.a.value = character.name;
+      run();
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     if (params.get('a')) run();
   }
 

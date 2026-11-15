@@ -87,13 +87,16 @@
     '- Keep "comment" to one short sentence. Be a good sport.'
   ].join('\n');
 
+  let persona = null;
+  function setPersona(text) { persona = text || null; }
+
   async function call(instruction, state) {
     const s = settings.get();
     if (!s.apiKey) throw new Error('Add your Anthropic API key in the duel settings to use the Claude opponent.');
     const body = {
       model: s.model,
       max_tokens: 16000,
-      system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }].concat(persona ? [{ type: 'text', text: persona }] : []),
       tools: [TOOL],
       tool_choice: { type: 'auto' },
       messages: [{ role: 'user', content: instruction + '\n\nCall take_actions now.\n\nGame state:\n' + JSON.stringify(state) }]
@@ -250,5 +253,5 @@
     }
   }
 
-  App.ClaudeOpponent = { settings: settings, MODELS: MODELS, takeTurn: takeTurn, respondToAttack: respondToAttack, call: call, apply: apply };
+  App.ClaudeOpponent = { settings: settings, MODELS: MODELS, takeTurn: takeTurn, respondToAttack: respondToAttack, call: call, apply: apply, setPersona: setPersona };
 })(window.App);

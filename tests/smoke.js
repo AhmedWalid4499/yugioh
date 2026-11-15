@@ -288,6 +288,20 @@ function apiResponse(url) {
   }
   await shot('10-duel-after-bot');
 
+  console.log('Famous duelists');
+  await page.goto(URL_BASE + '#/duel');
+  await page.waitForSelector('.char-tile');
+  check((await page.locator('.char-tile').count()) >= 15, 'the duel screen offers famous duelists to pick');
+  await page.click('.char-tile[data-char="yugi"]');
+  check((await page.inputValue('#duel-form [name=theirs]')) === '__char:yugi', 'clicking Yugi selects him as the opponent');
+  await page.selectOption('#duel-form [name=first]', 'opp');
+  await page.check('#duel-form [name=ai][value=bot]');
+  await page.click('#duel-form button[type=submit]');
+  await page.waitForSelector('.board');
+  await page.waitForFunction(() => { const d = App.duelSession().duel; return d.active === 0 || d.winner != null; }, null, { timeout: 15000 });
+  const yl = await page.evaluate(() => { const d = App.duelSession().duel; return { name: d.players[1].name, deck: d.players[1].deckName, log: d.log.map((l) => l.text).join('\n') }; });
+  check(yl.name === 'Yugi' && yl.deck === 'Yugi\'s Deck' && /Yugi Muto steps up/.test(yl.log) && /Turn 1: Yugi/.test(yl.log), 'duel against Yugi with his own deck (played by the bot)');
+
   console.log('Duel vs Claude (mocked API)');
   await page.goto(URL_BASE + '#/duel');
   await page.waitForSelector('#duel-form');

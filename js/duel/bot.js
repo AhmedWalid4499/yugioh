@@ -8,9 +8,17 @@
 
   const E = () => App.Effects;
 
+  const roleMemo = {};
+  function roles(c) {
+    if (!roleMemo[c.id]) roleMemo[c.id] = App.insights.analyse(c.data).roleKeys;
+    return roleMemo[c.id];
+  }
+
   function value(duel, c) {
     if (duel.kind(c) !== 'monster') return 800;
-    return Math.max(duel.atk(c), duel.def(c)) + (Number(c.data.level) || 0) * 30;
+    const r = roles(c);
+    const bonus = (r.indexOf('starter') !== -1 || r.indexOf('searcher') !== -1 ? 600 : 0) + (r.indexOf('extender') !== -1 ? 200 : 0);
+    return Math.max(duel.atk(c), duel.def(c)) + (Number(c.data.level) || 0) * 30 + bonus;
   }
 
   function oppThreat(duel, p) {
@@ -83,7 +91,10 @@
     const pl = duel.players[p];
     if (pl.normalSummoned) return;
     const mine = duel.monsters(p).map((m) => m.card).sort((a, b) => value(duel, a) - value(duel, b));
-    const candidates = pl.hand.filter((c) => duel.kind(c) === 'monster' && !duel.isExtra(c) && !/cannot be normal summoned/i.test(c.data.desc || ''));
+    let candidates = pl.hand.filter((c) => duel.kind(c) === 'monster' && !duel.isExtra(c) && !/cannot be normal summoned/i.test(c.data.desc || ''));
+    // Hand traps are worth more in the hand (used on your turn) than on the field.
+    const notTraps = candidates.filter((c) => roles(c).indexOf('handtrap') === -1);
+    if (notTraps.length) candidates = notTraps;
     let best = null;
     candidates.forEach((c) => {
       const need = duel.tributesNeeded(c);
@@ -98,7 +109,8 @@
     if (duel.freeMz(p) === -1 && !best.tributes.length) return;
     const threat = oppThreat(duel, p);
     const c = best.card;
-    const attack = duel.atk(c) >= threat || duel.atk(c) >= duel.def(c);
+    const attack = (duel.atk(c) >= threat && duel.atk(c) >= 1000) || (duel.atk(c) >= duel.def(c) && duel.atk(c) > threat) ||
+      (roles(c).indexOf('searcher') !== -1 && /if this card is normal (or special )?summoned/i.test(c.data.desc || '')); // face-up to use its search
     const r = duel.normalSummon(p, c.uid, attack ? 'atk' : 'set', best.tributes.map((t) => t.uid));
     if (!r.ok) return;
     await ui.pause();

@@ -127,7 +127,21 @@
     if (!name) throw new Error('Type an archetype name, for example "Lunalight".');
 
     const needMisc = fmt.key === 'goat' || fmt.key === 'speed';
-    let cards = await api.getArchetypeCards(name, { misc: needMisc });
+    // One or more archetypes (character decks mix several), plus signature cards.
+    const archList = o.archetypes && o.archetypes.length ? o.archetypes : [name];
+    let cards = [];
+    const seen = new Set();
+    const merge = (list) => list.forEach((c) => { if (!seen.has(c.id)) { seen.add(c.id); cards.push(c); } });
+    for (const a of archList) merge(await api.getArchetypeCards(a, { misc: needMisc }));
+    const sigIds = new Set();
+    const sigOrder = {};
+    if (o.signature && o.signature.length) {
+      const found = await api.getCardsByNames(o.signature, { misc: needMisc });
+      o.signature.forEach((n, i) => {
+        const c = found[api.normName(n)];
+        if (c) { sigIds.add(c.id); sigOrder[c.id] = i; merge([c]); }
+      });
+    }
     if (!cards.length) {
       const res = await api.searchCards({ q: name }, 0, 60);
       cards = res.cards;
@@ -139,7 +153,7 @@
     const skipped = cards.length - pool.length;
     const scored = pool.map((c) => {
       const info = App.insights.analyse(c);
-      return { card: c, info: info, score: score(c, info, pool) };
+      return { card: c, info: info, score: score(c, info, pool) + (sigIds.has(c.id) ? 6 : 0), signature: sigIds.has(c.id) };
     }).sort((a, b) => b.score - a.score || String(a.card.name).localeCompare(b.card.name));
 
     const target = fmt.main[0];
@@ -159,8 +173,16 @@
     // 1. The archetype engine.
     const mains = scored.filter((x) => !api.isExtraDeck(x.card));
     const engineTarget = target - stapleSlots;
+    // Signature cards always make the deck (the ace gets 3 copies), in the character's order.
+    const bySig = (a, b) => sigOrder[a.card.id] - sigOrder[b.card.id];
+    for (const x of mains.filter((m) => m.signature).sort(bySig)) {
+      if (count('main') >= engineTarget) break;
+      const want = sigOrder[x.card.id] === 0 || x.score >= 14 ? 3 : 2;
+      add(x.card, Math.min(want, engineTarget - count('main')), 'main', 'Signature card · ' + reasonFor(x.info, x.card));
+    }
     for (const x of mains) {
       if (count('main') >= engineTarget) break;
+      if (x.signature) continue;
       const want = x.score >= 8 ? 3 : x.score >= 5 ? 2 : 1;
       add(x.card, Math.min(want, engineTarget - count('main')), 'main', reasonFor(x.info, x.card));
     }
@@ -191,10 +213,10 @@
     if (count('main') < target) notes.push('Only ' + count('main') + ' cards could be found for the Main Deck — add ' + (target - count('main')) + ' more by hand.');
 
     // 4. Extra Deck: archetype monsters first, then generic options.
-    const extras = scored.filter((x) => api.isExtraDeck(x.card));
+    const extras = scored.filter((x) => api.isExtraDeck(x.card)).sort((a, b) => (b.signature ? 1 : 0) - (a.signature ? 1 : 0));
     for (const x of extras) {
       if (count('extra') >= fmt.extra) break;
-      add(x.card, x.score >= 8 && fmt.extra - count('extra') > 3 ? 2 : 1, 'extra', reasonFor(x.info, x.card) || 'Archetype Extra Deck monster');
+      add(x.card, x.score >= 8 && fmt.extra - count('extra') > 3 ? 2 : 1, 'extra', (x.signature ? 'Signature card · ' : '') + (reasonFor(x.info, x.card) || 'Archetype Extra Deck monster'));
     }
     const hasTuner = pool.some((c) => /Tuner/.test(c.type));
     const level4s = pool.filter((c) => Number(c.level) === 4 && !api.isExtraDeck(c)).length;
@@ -225,7 +247,7 @@
     return {
       archetype: name,
       format: fmt.key,
-      name: name + ' (auto-built)',
+      name: o.name || name + ' (auto-built)',
       main: ids('main'),
       extra: ids('extra'),
       side: [],
