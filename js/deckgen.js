@@ -57,6 +57,22 @@
     ]
   };
 
+  /* Used only when an archetype is too small to fill the Main Deck. */
+  const FILLERS = [
+    ['Mystical Space Typhoon', 3, 'Filler: quick Spell/Trap removal'],
+    ['Book of Moon', 2, 'Filler: flips a monster face-down at the right moment'],
+    ['Monster Reborn', 1, 'Filler: revives the best monster in either GY'],
+    ['Dark Hole', 1, 'Filler: clears the field of monsters'],
+    ['Raigeki', 1, 'Filler: destroys all of your opponent\'s monsters'],
+    ['Mirror Force', 1, 'Filler: punishes attacks'],
+    ['Torrential Tribute', 1, 'Filler: answers a big summon turn'],
+    ['Solemn Judgment', 1, 'Filler: negates a summon, Spell or Trap'],
+    ['Swords of Revealing Light', 1, 'Filler: buys three turns'],
+    ['Pot of Prosperity', 1, 'Filler: digs for the cards you need'],
+    ['Upstart Goblin', 3, 'Filler: thins the deck'],
+    ['Reinforcement of the Army', 1, 'Filler: searches a Warrior']
+  ];
+
   const EXTRA_STAPLES = {
     modern: [
       ['S:P Little Knight', 'link', 'Generic Link-2 that banishes a threat'],
@@ -209,6 +225,18 @@
     for (const x of mains) {
       if (count('main') >= target) break;
       add(x.card, target - count('main'), 'main', reasonFor(x.info, x.card));
+    }
+    // 4. Small archetype? Fill up with dependable generic cards so the deck is legal.
+    if (count('main') < target) {
+      try {
+        const found = await api.getCardsByNames(FILLERS.map((f) => f[0]), { misc: needMisc });
+        App.decks.rememberMany(Object.keys(found).map((k) => found[k]));
+        for (const [n, copies, why] of FILLERS) {
+          if (count('main') >= target) break;
+          const card = found[api.normName(n)];
+          if (card && F.cardAllowed(card, fmt.key)) add(card, Math.min(copies, target - count('main')), 'main', why, true);
+        }
+      } catch (e) { /* offline: leave it short */ }
     }
     if (count('main') < target) notes.push('Only ' + count('main') + ' cards could be found for the Main Deck — add ' + (target - count('main')) + ' more by hand.');
 

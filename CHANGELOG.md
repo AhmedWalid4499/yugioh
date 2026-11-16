@@ -2,6 +2,26 @@
 
 Each `## <version>` section becomes the "What's new" text shown in the app's update dialog and on the GitHub Release page.
 
+## 1.9.0
+- **New rivals:**
+  - Duel Monsters: **Marik** (The Winged Dragon of Ra, Lava Golem, Revival Jam) and **Bakura** (Destiny Board, Spirit Message, Dark Necrofear).
+  - GX: **Syrus** (Vehicroids), **Alexis** (Cyber Blader, Cyber Angels), **Jesse** (Crystal Beasts, Rainbow Dragon) and **Yubel**.
+  - That makes 32 duelists in all.
+- **Academy look:** a bright new theme with sky, sea and an academy island, in the spirit of the GX handheld games. It's original artwork, not taken from any game. You can switch back to the dark Arena look in your profile.
+- **Dorm colours:** pick Red, Yellow or Blue in your profile (click your name on the main menu). Buttons and highlights follow your dorm.
+- **Animation flow:**
+  - Screens slide in with a colour wipe.
+  - Before each duel, your rival says a line in a speech bubble, then a coin toss decides who goes first and "DUEL!" slams in. Press Skip to jump ahead.
+  - Tribute, Fusion, Synchro, Xyz and Link Summons get a full-screen cut-in with the card's art and name.
+  - Turn changes sweep across with the duelist's portrait, and LP counters roll down.
+  - A Victory/Defeat screen shows your rival's reaction, the Duel Points you earned and your record.
+- **Duel Points (DP) and the Card Shop:**
+  - Earn 500 DP for a win (+300 the first time you beat each rival) and 100 DP for a loss. You start with 1,000.
+  - Spend DP on booster packs from real sets, classics from Legend of Blue Eyes to Light of Destruction plus the newest releases.
+  - Tear packs open, flip the cards one by one (Ultra and Secret Rares flash), and keep them in **My binder**.
+- Every duelist now has their own pre-duel, victory and defeat lines.
+- Small archetypes (like Yubel's) are topped up to 40 cards with dependable generic cards.
+
 ## 1.8.0
 - **Card effects now follow the rules.** Each card's text is split into its separate effects, the way the rules read it. Only the effect you choose is used; before, the app ran the first thing it recognised anywhere in the card's text.
 - **Timing:**
