@@ -273,5 +273,42 @@
     }
   }
 
-  App.ClaudeOpponent = { settings: settings, MODELS: MODELS, takeTurn: takeTurn, respondToAttack: respondToAttack, call: call, apply: apply, setPersona: setPersona };
+  /* Free conversation (campus chat with a character). system: string; messages: [{role, content}].
+     Returns the reply text. Uses the same key and model as the Claude opponent. */
+  async function chat(system, messages) {
+    const s = settings.get();
+    if (!s.apiKey) throw new Error('Add your Anthropic API key (Duel → Who plays your opponent → Claude AI) to chat freely.');
+    const body = {
+      model: s.model,
+      max_tokens: 2000,
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      messages: messages
+    };
+    const headers = {
+      'content-type': 'application/json',
+      'x-api-key': s.apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    };
+    if (s.model !== 'claude-haiku-5-5') {
+      headers['anthropic-beta'] = 'server-side-fallback-2026-07-01';
+      body.fallbacks = 'default';
+    }
+    let res;
+    try {
+      res = await fetch(ENDPOINT, { method: 'POST', headers: headers, body: JSON.stringify(body) });
+    } catch (e) {
+      throw new Error('Could not reach the Claude API. Check your internet connection.');
+    }
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('Your Anthropic API key was rejected. Check it in the duel settings.');
+      if (res.status === 429) throw new Error('The Claude API is rate-limiting this key. Try again in a minute.');
+      throw new Error('Claude API error: ' + (json && json.error && json.error.message ? json.error.message : 'HTTP ' + res.status));
+    }
+    if (json.stop_reason === 'refusal') throw new Error('Claude declined to answer that.');
+    return (json.content || []).filter((b) => b.type === 'text').map((b) => b.text).join(' ').trim();
+  }
+
+  App.ClaudeOpponent = { settings: settings, MODELS: MODELS, takeTurn: takeTurn, respondToAttack: respondToAttack, call: call, apply: apply, setPersona: setPersona, chat: chat };
 })(window.App);

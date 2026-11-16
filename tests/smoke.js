@@ -93,9 +93,9 @@ function apiResponse(url) {
   await page.keyboard.press('Enter');
   await page.waitForSelector('.title-screen', { state: 'detached' });
   check((await page.locator('.mm-item').count()) >= 6 && (await page.locator('[data-nav="home"].active').count()) === 1, 'pressing Start opens the main menu');
-  check((await page.getAttribute('.mm-item.on', 'data-item')) === 'duel' && (await page.locator('.pv-duel .btn-primary').count()) === 1, 'Free Duel is highlighted with today\'s rival');
+  check((await page.getAttribute('.mm-item.on', 'data-item')) === 'campus' && (await page.locator('.pv-campus .btn-primary').count()) === 1, 'Academy Campus is highlighted first');
   await page.keyboard.press('ArrowDown');
-  check((await page.getAttribute('.mm-item.on', 'data-item')) === 'decks', 'arrow keys move through the menu');
+  check((await page.getAttribute('.mm-item.on', 'data-item')) === 'duel' && (await page.locator('.pv-duel .btn-primary').count()) === 1, 'arrow keys move through the menu (Free Duel shows today\'s rival)');
   await page.hover('.mm-item[data-item="search"]');
   await page.fill('.pv-search input', 'dark magician');
   await page.press('.pv-search input', 'Enter');
@@ -128,6 +128,24 @@ function apiResponse(url) {
   check((await page.textContent('#dp-badge')).trim() === '800 DP', 'the pack cost 200 DP');
   await page.goto(URL_BASE + '#/shop?tab=binder');
   check((await page.locator('.binder-card').count()) >= 1, 'the cards are in your binder');
+  console.log('Academy Campus');
+  await page.goto(URL_BASE + '#/campus');
+  await page.waitForSelector('.place');
+  check((await page.locator('.place').count()) === 8, 'the campus map has 8 places');
+  const spot = await page.evaluate(() => { const w = App.bonds.whereabouts(); return Object.keys(w).find((k) => w[k].length); });
+  await page.click('.place[href="#/campus?at=' + spot + '"]');
+  await page.waitForSelector('.npc');
+  await page.click('.npc >> nth=0', { force: true });
+  await page.waitForSelector('.vn-choice');
+  check(/\S/.test(await page.textContent('.vn-text')), 'meeting a duelist opens a conversation');
+  await page.click('.vn-choice:has-text("Talk")');
+  await page.waitForSelector('.vn-choice:has-text("Tell me more")');
+  await page.click('.vn-choice:has-text("Tell me more")');
+  await page.waitForFunction(() => Object.values((JSON.parse(localStorage.getItem('dv-bonds') || '{}').people) || {}).some((x) => x.pts > 0));
+  check(true, 'answering raises your friendship');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.vn', { state: 'detached' });
+  check(true, 'Esc ends the conversation');
   await page.goto(URL_BASE + '#/help');
   check((await page.locator('.glossary dt').count()) >= 10 && (await page.locator('#help-duel .help-steps').count()) === 1, 'Help page explains duels and Yu-Gi-Oh! words');
 

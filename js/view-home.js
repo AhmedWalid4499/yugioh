@@ -28,6 +28,7 @@
     const items = [];
     if (liveDuel) items.push({ id: 'continue', icon: '▶', label: 'Continue Duel', href: '#/duel/play', sub: 'Turn ' + liveDuel.duel.turn + ' vs ' + liveDuel.duel.pname(1) });
     items.push(
+      { id: 'campus', icon: '🏝', label: 'Academy Campus', href: '#/campus', sub: 'Meet the duelists · ' + App.bonds.slotName() },
       { id: 'duel', icon: '⚔', label: 'Free Duel', href: '#/duel', sub: chars.length + ' rivals · ' + beaten + ' beaten' },
       { id: 'decks', icon: '🂠', label: 'Deck Editor', href: '#/decks', sub: decks.length ? decks.length + (decks.length === 1 ? ' deck' : ' decks') : 'No decks yet' },
       { id: 'build', icon: '⚡', label: 'Auto-Build', href: '#/build', sub: 'A full deck in one click' },
@@ -61,6 +62,15 @@
           '<p class="pv-record">' + App.profile.dp().toLocaleString('en-US') + ' DP · ' + owned + ' different cards in your binder</p>' +
           '<div class="row"><a class="btn btn-primary btn-big" href="#/shop">🛒 Buy packs</a><a class="btn" href="#/shop?tab=binder">My binder</a></div></div>';
       },
+      campus: () => {
+        const partner = App.bonds.partner();
+        const friends = chars.filter((c) => App.bonds.get(c.id).pts > 0).length;
+        return (partner ? '<div class="pv-art char-art" data-ace="' + esc(App.characters.get(partner).ace) + '"></div>' : '<div class="pv-art pv-island"></div>') +
+          '<div class="pv-body"><div class="pv-kicker">' + esc(App.bonds.slotName()) + ' on the island</div><h2>Academy Campus</h2>' +
+          '<p class="muted">Walk around the island and meet the duelists: talk, give them cards, duel them and become friends. Reach 3 ❤ and they can become your partner.</p>' +
+          '<p class="pv-record">' + friends + ' friend' + (friends === 1 ? '' : 's') + (partner ? ' · Partner: ' + esc(App.characters.get(partner).short) : '') + '</p>' +
+          '<a class="btn btn-primary btn-big" href="#/campus">🏝 Go to campus</a></div>';
+      },
       releases: () => '<div class="pv-body"><h2>New Releases</h2><p class="muted">Upcoming and recent products and newly released cards. Star a set to add it to your watchlist.</p><a class="btn btn-primary btn-big" href="#/releases">✦ See releases</a></div>',
       help: () => '<div class="pv-body"><h2>Help &amp; Guide</h2><p class="muted">How each screen works, how to duel, and what words like <em>Tribute</em>, <em>Chain</em> and <em>Hand trap</em> mean.</p><a class="btn btn-primary btn-big" href="#/help">? Open the guide</a></div>'
     };
@@ -69,7 +79,7 @@
       '<div class="mm-left">' +
         '<div class="player-card">' + App.characters.avatar('you', 'big') +
           '<div class="pc-info"><button type="button" class="pc-name" id="pc-name" title="Edit your profile: name, dorm colour, theme">' + esc(prof.name || 'Duelist') + ' ✎</button>' +
-          '<div class="pc-dorm">' + esc((App.profile.dorms[prof.dorm] || App.profile.dorms.red).label) + '</div>' +
+          '<div class="pc-dorm">' + esc((App.profile.dorms[prof.dorm] || App.profile.dorms.red).label) + (App.bonds.partner() ? ' · Partner: ' + esc(App.characters.get(App.bonds.partner()).short) : '') + '</div>' +
           '<div class="pc-rank">' + esc(App.profile.rank()) + '</div>' +
           '<div class="pc-rec"><span class="w">' + prof.wins + ' W</span><span class="l">' + prof.losses + ' L</span>' + (next ? '<span class="muted small">' + next.wins + ' more ' + (next.wins === 1 ? 'win' : 'wins') + ' to ' + esc(next.title) + '</span>' : '') + '</div></div>' +
         '</div>' +

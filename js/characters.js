@@ -270,11 +270,13 @@
   };
 
   let aces = null;
+  let aceMap = {};
   /* Loads each character's ace card (for its picture). */
   function loadAces() {
     if (!aces) {
       aces = App.api.getCardsByNames(CHARACTERS.map((c) => c.ace)).then((found) => {
         App.decks.rememberMany(Object.keys(found).map((k) => found[k]));
+        aceMap = found;
         return found;
       }).catch(() => { aces = null; return {}; });
     }
@@ -382,6 +384,9 @@
     wirePortraits: wirePortraits,
     list: () => CHARACTERS.slice(),
     get: (id) => CHARACTERS.find((c) => c.id === id) || null,
+    /* The ace card's data, once loaded (see paintArt). */
+    aceData: (id) => { const c = CHARACTERS.find((x) => x.id === id); return c ? aceMap[App.api.normName(c.ace)] || null : null; },
+    loadAces: loadAces,
     /* kind: 'intro' | 'win' (they won) | 'lose' (they lost) */
     line: (id, kind) => { const l = LINES[id]; return l ? l[{ intro: 0, win: 1, lose: 2 }[kind] || 0] : ''; },
     /* Builds the character's deck for a format (live, newest support). */

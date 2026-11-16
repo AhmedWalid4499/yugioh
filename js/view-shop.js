@@ -45,6 +45,15 @@
     return isNew;
   }
 
+  function removeFromCollection(id) {
+    const c = collection();
+    if (!c[id]) return false;
+    c[id].n -= 1;
+    if (c[id].n <= 0) delete c[id];
+    U.store.set(COLL, c);
+    return true;
+  }
+
   /* The cards of a set, grouped by rarity in that set. */
   async function setPool(setName) {
     const cards = await api.getSetCards(setName);
@@ -203,7 +212,7 @@
     });
   }
 
-  App.shop = { rollPack: rollPack, tier: tier, collection: collection, addToCollection: addToCollection, PRICE: PRICE };
+  App.shop = { rollPack: rollPack, tier: tier, collection: collection, addToCollection: addToCollection, removeFromCollection: removeFromCollection, PRICE: PRICE };
   App.views = App.views || {};
   App.views.shop = page;
 })(window.App);

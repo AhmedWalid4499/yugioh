@@ -415,6 +415,7 @@
         '<div class="res-body">' + (ch ? App.characters.avatar(ch, 'huge') : '') +
           '<div class="res-info">' + (line ? '<div class="bubble"><span class="who">' + esc(duel.pname(1)) + '</span><span class="say">' + esc(line) + '</span></div>' : '') +
           '<div class="res-dp">+<span id="dp-count" data-to="' + r.dp + '">0</span> DP' + (r.firstWin ? '<small>First win against ' + esc(duel.pname(1)) + ': +300 bonus!</small>' : '') + '</div>' +
+          (ch && s.bond ? '<div class="res-bond">❤ Friendship with ' + esc(duel.pname(1)) + ' up' + (s.bond.rewards.length ? ': ' + s.bond.rewards.map((x) => x.level + ' ❤! You received ' + esc(x.text)).join('; ') : '') + '</div>' : '') +
           '<div class="res-rec">' + (rec ? 'Record vs ' + esc(duel.pname(1)) + ': <span class="w">' + rec.w + ' W</span> <span class="l">' + rec.l + ' L</span> · ' : '') + esc(App.profile.rank()) + ' · ' + App.profile.dp().toLocaleString('en-US') + ' DP</div></div></div>' +
         '<div class="row center"><button type="button" class="btn btn-primary" id="rematch">Rematch</button><a class="btn" href="#/duel">Choose a rival</a><a class="btn" href="#/shop">🛒 Card Shop</a><a class="btn btn-ghost" href="#/home">Main menu</a></div></div>';
     }
@@ -443,6 +444,7 @@
       if (duel.winner != null && !s.recorded) {
         s.recorded = true;
         s.reward = App.profile.record(s.character, duel.winner === 0);
+        if (s.character) App.bonds.add(s.character, duel.winner === 0 ? 6 : 4).then((r) => { s.bond = r; render(); }).catch(() => {});
         // Close any open duel dialog (e.g. a response window): the duel is over.
         if (!document.getElementById('modal').hidden) C.closeModal();
       }
@@ -563,6 +565,19 @@
       setTimeout(() => b.remove(), 1500);
     }
 
+    /* Your partner cheers you on (a small bubble in the corner). */
+    function partnerCheer() {
+      const pid = App.bonds.partner();
+      if (!pid || speed <= 150 || pid === s.character) return;
+      document.querySelectorAll('.partner-cheer').forEach((x) => x.remove());
+      const b = document.createElement('div');
+      b.className = 'partner-cheer';
+      b.innerHTML = App.characters.avatar(pid) + '<span class="bubble"><span class="who">' + esc(App.characters.get(pid).short) + '</span><span class="say">' + esc(App.bonds.cheer(pid)) + '</span></span>';
+      document.body.appendChild(b);
+      App.characters.paintArt(b);
+      setTimeout(() => b.remove(), 2600);
+    }
+
     /* Turn change: a wipe with the duelist's portrait. */
     function turnWipe(p) {
       document.querySelectorAll('.turn-wipe').forEach((x) => x.remove());
@@ -573,6 +588,7 @@
       document.body.appendChild(w);
       App.characters.paintArt(w);
       setTimeout(() => w.remove(), speed > 150 ? 1400 : 700);
+      if (p === 0 && Math.random() < 0.6) setTimeout(partnerCheer, 1200);
     }
 
     /* LP counters roll from the old value to the new one. */
@@ -650,7 +666,7 @@
       switch (type) {
         case 'summon':
           s.fxQueue.push({ uid: d.uid, cls: d.tribute ? 'fx-special' : 'fx-summon' });
-          if (d.tribute && speed > 150) { const l = duel.find(d.uid); if (l) App.game.cutIn(l.card, d.player, 'Tribute Summon'); }
+          if (d.tribute && speed > 150) { const l = duel.find(d.uid); if (l) App.game.cutIn(l.card, d.player, 'Tribute Summon'); if (d.player === 0) setTimeout(partnerCheer, 1500); }
           break;
         case 'special':
           s.fxQueue.push({ uid: d.uid, cls: d.extra ? 'fx-special' : 'fx-summon' });
