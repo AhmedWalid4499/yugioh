@@ -110,7 +110,10 @@
       run();
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-    if (params.get('a')) run();
+    if (params.get('char') && App.characters.get(params.get('char'))) {
+      const t = view.querySelector('.char-tile[data-char="' + params.get('char') + '"]');
+      if (t) t.click();
+    } else if (params.get('a')) run();
   }
 
   /* ---------- Draw Tester ---------- */

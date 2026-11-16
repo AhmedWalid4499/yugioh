@@ -4,6 +4,11 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 
 ## What it does
 
+### 🏫 Academy Campus: make friends with the duelists
+- **Campus map:** walk around the island; who is where changes in the morning, afternoon and evening. Click a duelist to talk in a visual-novel style scene.
+- **In a conversation:** Talk (once a day, with answers to choose and real duelling tips), Give a gift (a card from your binder), Duel, see their deck, or chat freely with Claude using your own API key.
+- **Friendship hearts:** each new heart has a reward (DP, cards from their deck, at 5 hearts their ace). At 3 hearts a duelist can become your **partner**, who cheers you on in duels.
+
 ### 🏝 Academy look, animations and the Card Shop
 - **Look:** the bright Academy theme (sky, sea and an academy island, original artwork) is the default. The dark Arena look is in your profile, along with your **dorm colour** (Red, Yellow or Blue).
 - **Animations:** screen wipes; a pre-duel speech bubble, coin toss and "DUEL!" call; summon cut-ins; turn-change sweeps; rolling LP; and a Victory/Defeat screen.

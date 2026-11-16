@@ -17,6 +17,7 @@
     [/^\/home$/, (v) => App.views.home(v), 'home'],
     [/^\/help$/, (v) => App.views.help(v), 'help'],
     [/^\/shop$/, (v, m, p) => App.views.shop(v, p), 'shop'],
+    [/^\/campus$/, (v, m, p) => App.views.campus(v, p), 'campus'],
     [/^\/search$/, (v, m, p) => App.views.search(v, p), 'search'],
     [/^\/archetype\/(.+)$/, (v, m) => App.views.archetype(v, decodeURIComponent(m[1])), 'search'],
     [/^\/releases$/, (v) => App.views.releases(v), 'releases'],
@@ -85,6 +86,8 @@
     if (!document.getElementById('modal').hidden) { C.closeModal(); return; }
     // Esc goes back to the main menu, like a game (not from the duel board, to avoid accidents).
     if (document.body.classList.contains('title-open')) return;
+    // In a conversation, Esc just ends it.
+    if (document.body.classList.contains('vn-open')) { const x = document.querySelector('.vn-close'); if (x) x.click(); return; }
     // In a text box, Esc just leaves the box; press it again to go to the menu.
     if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.target.blur(); return; }
     const h = location.hash;

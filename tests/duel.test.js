@@ -11,7 +11,7 @@ const ROOT = path.resolve(__dirname, '..');
 global.window = global;
 global.localStorage = { _d: {}, getItem(k) { return this._d[k] == null ? null : this._d[k]; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
 global.document = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
-['js/util.js', 'js/formats.js', 'js/api.js', 'js/insights.js', 'js/decks.js', 'js/deckgen.js', 'js/characters.js', 'js/game.js', 'js/duel/engine.js', 'js/duel/materials.js', 'js/duel/effects.js', 'js/duel/bot.js', 'js/duel/claude.js']
+['js/util.js', 'js/formats.js', 'js/api.js', 'js/insights.js', 'js/decks.js', 'js/deckgen.js', 'js/characters.js', 'js/game.js', 'js/bonds.js', 'js/duel/engine.js', 'js/duel/materials.js', 'js/duel/effects.js', 'js/duel/bot.js', 'js/duel/claude.js']
   .forEach((f) => vm.runInThisContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }));
 const App = global.App;
 const { cards } = require('./fixtures');
@@ -92,6 +92,30 @@ function giveHand(d, p, names) {
   check(App.profile.rank(0) === 'Rookie Duelist' && App.profile.rank(3) === 'Duelist' && App.profile.rank(10) === 'Expert Duelist' && App.profile.nextRank().title === 'Duelist', 'ranks go up with wins');
   check(App.profile.setName('  Kaiba Fan  ') === 'Kaiba Fan' && App.profile.name() === 'Kaiba Fan', 'your duelist name is saved (trimmed)');
   Object.assign(App.api, realApi);
+
+  console.log('Friendship (campus)');
+  {
+    const Bd = App.bonds;
+    App.shop = App.shop || { addToCollection: () => [] };
+    const where = Bd.whereabouts();
+    const placed = [].concat.apply([], Object.keys(where).map((k) => where[k]));
+    check(placed.length === App.characters.list().length && new Set(placed).size === placed.length, 'every duelist is somewhere on campus, exactly once');
+    check(Bd.hearts('jaden') === 0, 'friendships start at 0 hearts');
+    const dpBefore = App.profile.dp();
+    const r1 = await Bd.add('jaden', 25);
+    check(r1.after === 1 && r1.rewards.length === 1 && App.profile.dp() === dpBefore + 300, 'reaching 1 heart gives a reward (300 DP)');
+    const r2 = await Bd.add('jaden', 0);
+    check(r2.rewards.length === 0, 'a reward is only given once');
+    check(Bd.rewardFor('jaden', 3).partner && /Neos/.test(Bd.rewardFor('jaden', 5).text), 'at 3 hearts they can be your partner; at 5 you get their ace');
+    check(Bd.giftTaste('jaden', { name: 'Elemental HERO Stratos', archetype: 'Elemental HERO' }) === 'love' && Bd.giftPts('love') > Bd.giftPts('ok'), 'duelists love cards from their own deck');
+    const tp = Bd.topic('kaiba');
+    check(tp.text && tp.choices.length === 3 && Bd.answer('kaiba', 'ask').pts > Bd.answer('kaiba', 'meh').pts, 'talking offers 3 answers; asking for a tip earns more friendship than shrugging');
+    Bd.markTalked('kaiba');
+    check(Bd.talkedToday('kaiba') && !Bd.talkedToday('yugi'), 'you can talk with each duelist once a day');
+    check(Bd.pushChat('ai', 'user', 'hi') === 2 && Bd.chatLog('ai').length === 1 && /Ai from Yu-Gi-Oh! VRAINS/.test(Bd.chatSystem('ai')) && /own words/.test(Bd.chatSystem('ai')), 'free chat keeps a short history and an in-character system prompt');
+    Bd.setPartner('jaden');
+    check(Bd.partner() === 'jaden' && Bd.whereabouts().dorms[0] === 'jaden' && Bd.cheer('jaden'), 'your partner waits in the dorms and cheers you on');
+  }
 
   console.log('Summoning materials');
   const M = App.Materials;

@@ -2,6 +2,18 @@
 
 Each `## <version>` section becomes the "What's new" text shown in the app's update dialog and on the GitHub Release page.
 
+## 1.10.0
+- **Academy Campus: meet the duelists.** Choose Campus on the main menu and walk around the island: the Classroom, Duel Arena, Card Shop, Cafeteria, Harbor, Lighthouse, Forest Path and Dorms. Different duelists hang out in each place in the morning, afternoon and evening.
+- **Conversations:** click a duelist to start a visual-novel style scene with typed dialogue. From there you can:
+  - **Talk** once a day and pick your answer. Asking for a tip gets you real duelling advice.
+  - **Give a gift**: a card from your binder, once a day. They love cards from their own deck.
+  - **Duel** them.
+  - Look at **their deck**, and build it in one click.
+- **Friendship hearts (❤):** they grow when you talk, give gifts and duel. Every new heart has a reward: DP, cards from their deck, and at 5 hearts their ace card.
+- **Partner:** at 3 hearts, ask a duelist to be your partner. Your partner waits in the Dorms, appears on your profile and cheers you on during duels.
+- **Chat freely:** with your Anthropic API key (the same one as the Claude opponent), type anything and the duelist answers in their own voice. Chatting also raises friendship a little each day.
+- After a duel against a duelist, the results screen shows your friendship going up.
+
 ## 1.9.0
 - **New rivals:**
   - Duel Monsters: **Marik** (The Winged Dragon of Ra, Lava Golem, Revival Jam) and **Bakura** (Destiny Board, Spirit Message, Dark Necrofear).
