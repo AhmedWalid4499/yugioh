@@ -84,6 +84,10 @@ function giveHand(d, p, names) {
   console.log('Duelist profile');
   App.profile.record('zarc', true); App.profile.record('zarc', false); App.profile.record(null, true);
   const prof = App.profile.get();
+  check(prof.dp === 1000 + 800 + 100 + 500, 'Duel Points: +500 a win (+300 the first time you beat a rival), +100 a loss');
+  check(App.profile.spend(200) && App.profile.dp() === 2200 && !App.profile.spend(99999), 'spending DP works, and you can\'t overspend');
+  check(['marik', 'bakura', 'syrus', 'alexis', 'jesse', 'yubel'].every((id) => App.characters.get(id) && App.characters.line(id, 'intro') && App.characters.line(id, 'win') && App.characters.line(id, 'lose')), 'new rivals Marik, Bakura, Syrus, Alexis, Jesse and Yubel each have their own lines');
+  check(App.characters.list().every((c) => App.characters.line(c.id, 'intro')), 'every rival has a pre-duel line');
   check(prof.wins === 2 && prof.losses === 1 && App.profile.vs('zarc').w === 1 && App.profile.vs('zarc').l === 1 && App.profile.vs('yugi').w === 0, 'wins and losses are recorded overall and per rival');
   check(App.profile.rank(0) === 'Rookie Duelist' && App.profile.rank(3) === 'Duelist' && App.profile.rank(10) === 'Expert Duelist' && App.profile.nextRank().title === 'Duelist', 'ranks go up with wins');
   check(App.profile.setName('  Kaiba Fan  ') === 'Kaiba Fan' && App.profile.name() === 'Kaiba Fan', 'your duelist name is saved (trimmed)');

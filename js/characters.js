@@ -42,11 +42,53 @@
       persona: 'theatrical, playful and fond of cartoons'
     },
     {
+      id: 'marik', color: '#d4a017', name: 'Marik Ishtar', short: 'Marik', series: 'Duel Monsters', ace: 'The Winged Dragon of Ra',
+      archetypes: ['Egyptian God'],
+      signature: ['The Winged Dragon of Ra', 'The Winged Dragon of Ra - Sphere Mode', 'The Winged Dragon of Ra - Immortal Phoenix', 'Lava Golem', 'Revival Jam', 'Gil Garth', 'Mystical Beast of Serket', 'Ra\'s Disciple'],
+      style: 'The Winged Dragon of Ra, backed by Lava Golem and Revival Jam.',
+      persona: 'a menacing schemer who loves to see opponents squirm'
+    },
+    {
+      id: 'bakura', color: '#6c3483', name: 'Yami Bakura', short: 'Bakura', series: 'Duel Monsters', ace: 'Dark Necrofear',
+      archetypes: ['Spirit Message'],
+      signature: ['Destiny Board', 'Spirit Message "I"', 'Spirit Message "N"', 'Spirit Message "A"', 'Spirit Message "L"', 'Dark Sanctuary', 'Dark Necrofear', 'Diabound Kernel', 'Man-Eater Bug'],
+      style: 'Spells out doom with Destiny Board while Dark Necrofear haunts the field.',
+      persona: 'a sinister spirit with a dark, mocking sense of humour'
+    },
+    {
       id: 'jaden', color: '#e74c3c', name: 'Jaden Yuki', short: 'Jaden', series: 'GX', ace: 'Elemental HERO Neos',
       archetypes: ['Elemental HERO', 'Neo-Spacian', 'HERO'],
       signature: ['Elemental HERO Neos', 'Elemental HERO Stratos', 'Elemental HERO Shadow Mist', 'Polymerization', 'Miracle Fusion', 'Elemental HERO Flame Wingman', 'Elemental HERO Sunrise'],
       style: 'Elemental HEROes that Fusion Summon into powerful heroes.',
       persona: 'cheerful and laid-back; duels for the fun of it'
+    },
+    {
+      id: 'syrus', color: '#5dade2', name: 'Syrus Truesdale', short: 'Syrus', series: 'GX', ace: 'Super Vehicroid Jumbo Drill',
+      archetypes: ['Roid'],
+      signature: ['Super Vehicroid Jumbo Drill', 'Steamroid', 'Gyroid', 'Drillroid', 'Submarineroid', 'Expressroid', 'Super Vehicroid - Stealth Union', 'Power Bond', 'Vehicroid Connection Zone'],
+      style: 'Vehicroid machines that fuse into Super Vehicroid Jumbo Drill.',
+      persona: 'nervous at first but braver every duel; looks up to his big brother'
+    },
+    {
+      id: 'alexis', color: '#f1948a', name: 'Alexis Rhodes', short: 'Alexis', series: 'GX', ace: 'Cyber Blader',
+      archetypes: ['Cyber Angel'],
+      signature: ['Cyber Blader', 'Cyber Tutu', 'Etoile Cyber', 'Blade Skater', 'Cyber Angel Benten', 'Cyber Angel Dakini', 'Machine Angel Ritual'],
+      style: 'Graceful Cyber Girls and Ritual Cyber Angels led by Cyber Blader.',
+      persona: 'cool, skilled and confident; the top duelist of her dorm'
+    },
+    {
+      id: 'jesse', color: '#48c9b0', name: 'Jesse Anderson', short: 'Jesse', series: 'GX', ace: 'Rainbow Dragon',
+      archetypes: ['Crystal Beast'],
+      signature: ['Rainbow Dragon', 'Crystal Beast Ruby Carbuncle', 'Crystal Beast Sapphire Pegasus', 'Crystal Beast Amethyst Cat', 'Crystal Beacon', 'Rainbow Bridge', 'Rainbow Overdragon'],
+      style: 'Seven Crystal Beasts that gather to call Rainbow Dragon.',
+      persona: 'friendly, upbeat and close to his Crystal Beasts'
+    },
+    {
+      id: 'yubel', color: '#8e44ad', name: 'Yubel', short: 'Yubel', series: 'GX', ace: 'Yubel',
+      archetypes: ['Yubel'],
+      signature: ['Yubel', 'Yubel - Terror Incarnate', 'Yubel - The Ultimate Nightmare', 'Spirit of Yubel', 'Nightmare Pain', 'Samsara D Lotus'],
+      style: 'Yubel turns battle damage back on you, and grows stronger when destroyed.',
+      persona: 'obsessive and unsettling, speaks of love and pain in the same breath'
     },
     {
       id: 'zane', color: '#95a5a6', name: 'Zane Truesdale', short: 'Zane', series: 'GX', ace: 'Cyber End Dragon',
@@ -190,6 +232,43 @@
     }
   ];
 
+
+  /* Original lines for the pre-duel cut-in and the results screen (not quotes from the show). */
+  const LINES = {
+    yugi: ['Let\'s see where the cards lead us. Ready?', 'A great duel. Your deck has a lot of heart.', 'Well played! You earned that win.'],
+    kaiba: ['You dare challenge me? Fine. I\'ll make this quick.', 'As expected. Come back when you\'re worthy.', 'Hmph. A lucky draw. It won\'t happen twice.'],
+    joey: ['Alright, let\'s roll! I\'m fired up!', 'Yeah! Did you see that comeback?!', 'Aw man... Rematch! Right now!'],
+    mai: ['Try to keep up, sweetie.', 'Better luck next time, darling.', 'Not bad... I\'ll admit you surprised me.'],
+    pegasus: ['Oh, how delightful! Shall we begin our little show?', 'What a charming performance — for me!', 'Oh my! That was not in my script at all.'],
+    marik: ['Your soul trembles already. Let the punishment begin.', 'Ahaha! Kneel before the might of the gods!', 'Impossible... this cannot be!'],
+    bakura: ['Let\'s play a little game, shall we? The stakes are... high.', 'Your fate was sealed the moment you sat down.', 'Tch. Enjoy it while it lasts.'],
+    jaden: ['This is gonna be a blast! Let\'s duel!', 'That was so much fun! Let\'s go again sometime!', 'Whoa, you\'re good! That was awesome!'],
+    syrus: ['I-I can do this! Let\'s duel!', 'I won? I actually won! Thanks for the duel!', 'Aww... I\'ll train harder, I promise.'],
+    alexis: ['Show me what you\'ve got. I won\'t hold back.', 'Nice try. Keep practising and you\'ll get there.', 'Impressive. You really earned that one.'],
+    jesse: ['Hey there, friend! Let\'s have a great duel!', 'Thanks for the duel! My Crystal Beasts had a blast.', 'Ha! You got me fair and square, partner!'],
+    yubel: ['You\'ll feel every bit of the pain I give you... with love.', 'Such sweet suffering. Again?', 'This isn\'t over. Nothing is ever over.'],
+    zane: ['Give me everything you have. Respect demands it.', 'You fought well. Never stop striving.', 'A worthy victory. I respect you.'],
+    aster: ['Destiny already decided how this ends.', 'Just as fate foretold.', 'So you can change destiny after all.'],
+    chazz: ['The great Chazz is here! Prepare to lose!', 'Ha! Chazz it up! Nobody beats me!', 'This... this was just a warm-up!'],
+    yusei: ['Let\'s see how our decks connect.', 'Good duel. Our bonds made the difference.', 'You read every move. Well done.'],
+    jack: ['There is only one king. Prove you can challenge him!', 'The king remains undefeated!', 'Hmph. Today the throne is yours.'],
+    crow: ['Let\'s fly! Don\'t blink or you\'ll miss it!', 'Ha! Too fast for ya!', 'Grounded... nice moves, though!'],
+    akiza: ['Don\'t underestimate my roses. They have thorns.', 'Every rose blooms in the end.', 'You really are strong. Thank you.'],
+    yuma: ['Let\'s feel the flow! I\'m not giving up, ever!', 'Kattobingu! We did it!', 'I lost... but I\'m not giving up!'],
+    kite: ['I have no time to waste. Let\'s finish this.', 'Exactly as calculated.', 'Hmph. You surpassed my calculations.'],
+    yuya: ['Ladies and gentlemen, welcome to the show!', 'And that\'s the finale! Did everyone smile?', 'You stole the show... I\'ll bring a better act!'],
+    yuto: ['I fight to protect what matters. Get ready.', 'This is for my friends.', 'You fought with conviction. I can respect that.'],
+    yugo: ['Clear the road! I\'m going full speed!', 'Nobody outruns me!', 'Hey, that was a cheap shot! Rematch!'],
+    yuri: ['Oh, a new specimen for my collection.', 'How delightful. You\'ll make a lovely card.', 'How rude. I wasn\'t done playing.'],
+    zarc: ['Every dimension will bow. You first.', 'Destruction is the only ending.', 'Impossible... I am supreme!'],
+    playmaker: ['Let\'s get this over with.', 'Calculation complete.', 'You were the better duelist today.'],
+    ai: ['Ooh, a challenger! Try not to cry when I win, okay?', 'Ta-da! Who\'s the best? Me!', 'Wait, what? That wasn\'t supposed to happen!'],
+    soulburner: ['Feel the burn! My soul is on fire!', 'Burned to a crisp!', 'Ugh, my fire went out... next time!'],
+    revolver: ['I will end this quickly and precisely.', 'Target eliminated.', 'A miscalculation. It will not happen again.'],
+    blueangel: ['Ready for a show? Smile for the crowd!', 'Thanks for watching, everyone!', 'Aww, I lost... but it was fun!'],
+    goonizuka: ['Ladies and gentlemen, the champion enters the ring!', 'And the crowd goes wild!', 'You got me in the final round...']
+  };
+
   let aces = null;
   /* Loads each character's ace card (for its picture). */
   function loadAces() {
@@ -303,6 +382,8 @@
     wirePortraits: wirePortraits,
     list: () => CHARACTERS.slice(),
     get: (id) => CHARACTERS.find((c) => c.id === id) || null,
+    /* kind: 'intro' | 'win' (they won) | 'lose' (they lost) */
+    line: (id, kind) => { const l = LINES[id]; return l ? l[{ intro: 0, win: 1, lose: 2 }[kind] || 0] : ''; },
     /* Builds the character's deck for a format (live, newest support). */
     buildDeck: function (id, format) {
       const ch = this.get(id);

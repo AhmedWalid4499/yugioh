@@ -4,6 +4,12 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 
 ## What it does
 
+### 🏝 Academy look, animations and the Card Shop
+- **Look:** the bright Academy theme (sky, sea and an academy island, original artwork) is the default. The dark Arena look is in your profile, along with your **dorm colour** (Red, Yellow or Blue).
+- **Animations:** screen wipes; a pre-duel speech bubble, coin toss and "DUEL!" call; summon cut-ins; turn-change sweeps; rolling LP; and a Victory/Defeat screen.
+- **Duel Points:** +500 a win (+300 for the first win against each rival) and +100 a loss.
+- **Card Shop:** spend DP on booster packs from real sets, open them with an animation, and collect the cards in **My binder**.
+
 ### 🎮 Title screen, main menu and profile
 - The app opens on an animated **title screen**. Press **Start** (click, or press Enter) to begin.
 - **Main menu:**
@@ -109,12 +115,12 @@ A personal Yu-Gi-Oh! TCG companion that runs in your web browser. Card data come
 - **Portraits** next to each duelist's name: their ace card by default, or any picture you choose with 📷 (saved on your device only). Official character artwork isn't included because it's copyrighted.
 
 ### 🌟 Famous duelists
-Pick a rival from the 26 duelists on the fighting-game style rival select (with series tabs and a ★ on every rival you've beaten), each with a **modern version of their deck**. It's built live from the newest support cards in the database and always includes their ace and signature cards:
+Pick a rival from the 32 duelists on the fighting-game style rival select (with series tabs and a ★ on every rival you've beaten), each with a **modern version of their deck**. It's built live from the newest support cards in the database and always includes their ace and signature cards:
 
 | Series | Duelists |
 | --- | --- |
-| Duel Monsters | Yugi (Dark Magician), Kaiba (Blue-Eyes), Joey (Red-Eyes), Mai (Harpie), Pegasus (Toon) |
-| GX | Jaden (Elemental HERO), Zane (Cyber Dragon), Aster (Destiny HERO), Chazz (Armed Dragon) |
+| Duel Monsters | Yugi (Dark Magician), Kaiba (Blue-Eyes), Joey (Red-Eyes), Mai (Harpie), Pegasus (Toon), Marik (Winged Dragon of Ra), Bakura (Destiny Board / Dark Necrofear) |
+| GX | Jaden (Elemental HERO), Syrus (Vehicroid), Alexis (Cyber Blader / Cyber Angel), Jesse (Crystal Beast), Yubel, Zane (Cyber Dragon), Aster (Destiny HERO), Chazz (Armed Dragon) |
 | 5D's | Yusei (Synchron/Junk/Stardust), Jack (Red Dragon Archfiend), Crow (Blackwing), Akiza (Rose Dragon) |
 | ZEXAL | Yuma (Utopia), Kite (Galaxy-Eyes/Photon) |
 | ARC-V | Yuya (Performapal/Odd-Eyes), Yuto (Phantom Knights), Yugo (Speedroid/Clear Wing), Yuri (Predaplant), Zarc (Supreme King) |

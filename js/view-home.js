@@ -31,6 +31,7 @@
       { id: 'duel', icon: '⚔', label: 'Free Duel', href: '#/duel', sub: chars.length + ' rivals · ' + beaten + ' beaten' },
       { id: 'decks', icon: '🂠', label: 'Deck Editor', href: '#/decks', sub: decks.length ? decks.length + (decks.length === 1 ? ' deck' : ' decks') : 'No decks yet' },
       { id: 'build', icon: '⚡', label: 'Auto-Build', href: '#/build', sub: 'A full deck in one click' },
+      { id: 'shop', icon: '🛒', label: 'Card Shop', href: '#/shop', sub: App.profile.dp().toLocaleString('en-US') + ' DP · booster packs' },
       { id: 'search', icon: '🔍', label: 'Card Database', href: '#/search', sub: 'Every card, with tips' },
       { id: 'releases', icon: '✦', label: 'New Releases', href: '#/releases', sub: 'What\'s out and coming' },
       { id: 'help', icon: '?', label: 'Help & Guide', href: '#/help', sub: 'How everything works' }
@@ -54,6 +55,12 @@
         '<form class="pv-form" data-go="build"><input name="q" type="search" placeholder="e.g. Lunalight, Snake-Eye, Blue-Eyes" aria-label="Archetype"><button class="btn btn-primary" type="submit">⚡ Build</button></form></div>',
       search: () => '<div class="pv-body"><h2>Card Database</h2><p class="muted">Read any card\'s effect, see which deck it belongs to and how to use it.</p>' +
         '<form class="pv-form" data-go="search"><input name="q" type="search" placeholder="e.g. Dark Magician, Ash Blossom" aria-label="Card name"><button class="btn btn-primary" type="submit">🔍 Search</button></form></div>',
+      shop: () => {
+        const owned = Object.keys(App.shop.collection()).length;
+        return '<div class="pv-body"><h2>Card Shop</h2><p class="muted">Spend the Duel Points you win on booster packs from real sets, from Legend of Blue Eyes to the newest releases. Tear them open and build your binder.</p>' +
+          '<p class="pv-record">' + App.profile.dp().toLocaleString('en-US') + ' DP · ' + owned + ' different cards in your binder</p>' +
+          '<div class="row"><a class="btn btn-primary btn-big" href="#/shop">🛒 Buy packs</a><a class="btn" href="#/shop?tab=binder">My binder</a></div></div>';
+      },
       releases: () => '<div class="pv-body"><h2>New Releases</h2><p class="muted">Upcoming and recent products and newly released cards. Star a set to add it to your watchlist.</p><a class="btn btn-primary btn-big" href="#/releases">✦ See releases</a></div>',
       help: () => '<div class="pv-body"><h2>Help &amp; Guide</h2><p class="muted">How each screen works, how to duel, and what words like <em>Tribute</em>, <em>Chain</em> and <em>Hand trap</em> mean.</p><a class="btn btn-primary btn-big" href="#/help">? Open the guide</a></div>'
     };
@@ -61,7 +68,8 @@
     view.innerHTML = '<section class="main-menu">' +
       '<div class="mm-left">' +
         '<div class="player-card">' + App.characters.avatar('you', 'big') +
-          '<div class="pc-info"><button type="button" class="pc-name" id="pc-name" title="Change your duelist name">' + esc(prof.name || 'Duelist') + ' ✎</button>' +
+          '<div class="pc-info"><button type="button" class="pc-name" id="pc-name" title="Edit your profile: name, dorm colour, theme">' + esc(prof.name || 'Duelist') + ' ✎</button>' +
+          '<div class="pc-dorm">' + esc((App.profile.dorms[prof.dorm] || App.profile.dorms.red).label) + '</div>' +
           '<div class="pc-rank">' + esc(App.profile.rank()) + '</div>' +
           '<div class="pc-rec"><span class="w">' + prof.wins + ' W</span><span class="l">' + prof.losses + ' L</span>' + (next ? '<span class="muted small">' + next.wins + ' more ' + (next.wins === 1 ? 'win' : 'wins') + ' to ' + esc(next.title) + '</span>' : '') + '</div></div>' +
         '</div>' +
@@ -89,10 +97,7 @@
     view.addEventListener('focusin', (e) => { const a = e.target.closest('.mm-item'); if (a) show(a.getAttribute('data-item'), true); });
     view.addEventListener('click', (e) => {
       if (e.target.closest('.mm-item, .pv a')) App.sound.play('menu-ok');
-      if (e.target.closest('#pc-name')) {
-        const n = prompt('Your duelist name:', prof.name || '');
-        if (n != null) { App.profile.setName(n); App.router(); }
-      }
+      if (e.target.closest('#pc-name')) editProfile();
     });
     view.addEventListener('submit', (e) => {
       const f = e.target.closest('.pv-form');
@@ -116,6 +121,32 @@
       U.$('.mm-item[data-item="' + n + '"]', view).focus();
     };
     document.addEventListener('keydown', onKey);
+  }
+
+  /* Profile: your name, dorm colour and the app's look. */
+  function editProfile() {
+    const prof = App.profile.get();
+    const D = App.profile.dorms;
+    App.C.openModal('<div class="profile-dlg"><h2 id="modal-title">Your duelist profile</h2>' +
+      '<label class="pf-row">Duelist name<input type="text" id="pf-name" maxlength="24" value="' + esc(prof.name || '') + '" placeholder="Duelist"></label>' +
+      '<div class="pf-row"><span>Dorm colour</span><div class="dorm-pick">' + Object.keys(D).map((k) => '<button type="button" class="dorm-btn' + (prof.dorm === k ? ' on' : '') + '" data-dorm="' + k + '" style="--c:' + D[k].color + '">' + esc(D[k].label) + '</button>').join('') + '</div></div>' +
+      '<div class="pf-row"><span>Look</span><div class="dorm-pick"><button type="button" class="theme-btn' + (prof.theme !== 'arena' ? ' on' : '') + '" data-theme="academy">☀ Academy (bright)</button><button type="button" class="theme-btn' + (prof.theme === 'arena' ? ' on' : '') + '" data-theme="arena">☾ Arena (dark)</button></div></div>' +
+      '<div class="row"><button type="button" class="btn btn-primary" id="pf-save">Save</button><button type="button" class="btn btn-ghost" data-close>Cancel</button></div></div>');
+    const body = document.querySelector('#modal-body .profile-dlg');
+    const pick = { dorm: prof.dorm, theme: prof.theme || 'academy' };
+    body.addEventListener('click', (e) => {
+      const d = e.target.closest('[data-dorm]');
+      const t = e.target.closest('[data-theme]');
+      if (d) { pick.dorm = d.getAttribute('data-dorm'); body.querySelectorAll('[data-dorm]').forEach((x) => x.classList.toggle('on', x === d)); App.profile.set({ dorm: pick.dorm }); App.sound.play('menu-move'); }
+      if (t) { pick.theme = t.getAttribute('data-theme'); body.querySelectorAll('[data-theme]').forEach((x) => x.classList.toggle('on', x === t)); App.profile.set({ theme: pick.theme }); App.sound.play('menu-move'); }
+      if (e.target.closest('#pf-save')) {
+        App.profile.setName(body.querySelector('#pf-name').value);
+        App.profile.set(pick);
+        App.sound.play('menu-ok');
+        App.C.closeModal();
+        App.router();
+      }
+    });
   }
 
   App.views = App.views || {};

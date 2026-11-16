@@ -16,6 +16,7 @@
   const ROUTES = [
     [/^\/home$/, (v) => App.views.home(v), 'home'],
     [/^\/help$/, (v) => App.views.help(v), 'help'],
+    [/^\/shop$/, (v, m, p) => App.views.shop(v, p), 'shop'],
     [/^\/search$/, (v, m, p) => App.views.search(v, p), 'search'],
     [/^\/archetype\/(.+)$/, (v, m) => App.views.archetype(v, decodeURIComponent(m[1])), 'search'],
     [/^\/releases$/, (v) => App.views.releases(v), 'releases'],
@@ -47,6 +48,19 @@
     U.$$('[data-nav]').forEach((a) => a.classList.toggle('active', a.getAttribute('data-nav') === route[2]));
     route[1](page, m, params);
     window.scrollTo(0, 0);
+    // Screen transition: the new page slides in, with a quick colour wipe in the Academy theme.
+    if (App.router.ready && !/^\/duel\/play/.test(path)) {
+      page.classList.add('page-enter');
+      if (document.body.classList.contains('theme-academy')) {
+        document.querySelectorAll('.route-wipe').forEach((x) => x.remove());
+        const w = document.createElement('div');
+        w.className = 'route-wipe';
+        w.innerHTML = '<span></span><span></span><span></span>';
+        document.body.appendChild(w);
+        setTimeout(() => w.remove(), 700);
+      }
+    }
+    App.router.ready = true;
   };
 
   /* Any element with data-card-id opens that card's details. */

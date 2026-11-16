@@ -244,7 +244,8 @@
         fast);
       try {
         await start(setup);
-        await splash.ready();
+        const fi = session.firstInfo;
+        await splash.ready({ line: ch ? App.characters.line(ch.id, 'intro') : '', coin: fi.coin ? { youFirst: fi.youFirst, firstName: fi.firstName } : null });
         location.hash = '#/duel/play';
       } catch (err) {
         splash.fail();
@@ -299,7 +300,8 @@
     duel.log.unshift({ turn: 0, text: (setup.first === 'coin' ? 'Coin toss: ' : '') + (first === 0 ? 'You go' : oppSpec.playerName + ' goes') + ' first. Format: ' + fmt.label + '.' });
     if (character) duel.log.unshift({ turn: 0, text: character.name + ' steps up with ' + character.style.charAt(0).toLowerCase() + character.style.slice(1).replace(/\.$/, '') + (setup.ai === 'claude' ? ' (played by Claude).' : ' (played by the built-in bot).') });
     if (mine.main.length < fmt.main[0]) duel.log.unshift({ turn: 0, text: 'Note: your deck is below the ' + fmt.label + ' minimum (' + fmt.main[0] + ') — fine for practice.' });
-    session = { duel: duel, oppType: setup.ai, reveal: false, busy: false, status: '', resolving: null, setup: setup, character: character ? character.id : null };
+    session = { duel: duel, oppType: setup.ai, reveal: false, busy: false, status: '', resolving: null, setup: setup, character: character ? character.id : null,
+      firstInfo: { coin: setup.first === 'coin', youFirst: first === 0, firstName: oppSpec.playerName } };
   }
 
   /* ---------- the board ---------- */
@@ -402,6 +404,21 @@
       }).join('') + '</div>';
     }
 
+    /* The results screen: victory or defeat, the rival's words, DP earned and your record. */
+    function resultsHtml() {
+      const won = duel.winner === 0;
+      const ch = s.character;
+      const line = ch ? App.characters.line(ch, won ? 'lose' : 'win') : '';
+      const rec = ch ? App.profile.vs(ch) : null;
+      const r = s.reward || { dp: 0 };
+      return '<div class="results ' + (won ? 'won' : 'lost') + '"><div class="res-title">' + (won ? 'Victory!' : 'Defeat') + '</div>' +
+        '<div class="res-body">' + (ch ? App.characters.avatar(ch, 'huge') : '') +
+          '<div class="res-info">' + (line ? '<div class="bubble"><span class="who">' + esc(duel.pname(1)) + '</span><span class="say">' + esc(line) + '</span></div>' : '') +
+          '<div class="res-dp">+<span id="dp-count" data-to="' + r.dp + '">0</span> DP' + (r.firstWin ? '<small>First win against ' + esc(duel.pname(1)) + ': +300 bonus!</small>' : '') + '</div>' +
+          '<div class="res-rec">' + (rec ? 'Record vs ' + esc(duel.pname(1)) + ': <span class="w">' + rec.w + ' W</span> <span class="l">' + rec.l + ' L</span> · ' : '') + esc(App.profile.rank()) + ' · ' + App.profile.dp().toLocaleString('en-US') + ' DP</div></div></div>' +
+        '<div class="row center"><button type="button" class="btn btn-primary" id="rematch">Rematch</button><a class="btn" href="#/duel">Choose a rival</a><a class="btn" href="#/shop">🛒 Card Shop</a><a class="btn btn-ghost" href="#/home">Main menu</a></div></div>';
+    }
+
     /* One plain-English line telling you what you can do right now. */
     function guide() {
       if (duel.winner != null) return duel.winner === 0 ? 'You won! Press Rematch to play again.' : 'Duel over. Press Rematch to try again.';
@@ -423,7 +440,12 @@
     }
 
     function render() {
-      if (duel.winner != null && !s.recorded) { s.recorded = true; App.profile.record(s.character, duel.winner === 0); }
+      if (duel.winner != null && !s.recorded) {
+        s.recorded = true;
+        s.reward = App.profile.record(s.character, duel.winner === 0);
+        // Close any open duel dialog (e.g. a response window): the duel is over.
+        if (!document.getElementById('modal').hidden) C.closeModal();
+      }
       const myTurn = duel.active === 0;
       const ph = duel.phase;
       const canAct = myTurn && duel.winner == null && !s.busy;
@@ -469,12 +491,20 @@
             '<ol class="duel-log" id="duel-log">' + logHtml + '</ol>' +
           '</aside>' +
         '</div>' +
-        (duel.winner != null ? '<div class="winner-banner ' + (duel.winner === 0 ? 'won' : 'lost') + '"><div class="wb-kicker">Duel over</div><h2>' + (duel.winner === 0 ? '🏆 You win!' : '💀 ' + esc(duel.pname(1)) + ' wins') + '</h2>' +
-          '<p class="wb-rec">' + (s.character ? 'Record vs ' + esc(duel.pname(1)) + ': <span class="w">' + App.profile.vs(s.character).w + ' W</span> <span class="l">' + App.profile.vs(s.character).l + ' L</span> · ' : '') + esc(App.profile.rank()) + '</p>' +
-          '<div class="row center"><button type="button" class="btn btn-primary" id="rematch">Rematch</button><a class="btn" href="#/duel">Choose a rival</a><a class="btn btn-ghost" href="#/home">Main menu</a></div></div>' : '');
+        (duel.winner != null ? resultsHtml() : '');
       const log = U.$('#duel-log', root);
       if (log) log.scrollTop = log.scrollHeight;
       App.characters.paintArt(root);
+      rollLp();
+      const dpc = document.getElementById('dp-count');
+      if (dpc && s.dpAnimated) dpc.textContent = dpc.dataset.to;
+      else if (dpc) {
+        s.dpAnimated = true;
+        const to = Number(dpc.dataset.to) || 0;
+        const t0 = performance.now();
+        const tick = (t) => { const k = Math.min(1, (t - t0) / 900); const el = document.getElementById('dp-count'); if (!el) return; el.textContent = Math.round(to * k); if (k < 1) requestAnimationFrame(tick); };
+        requestAnimationFrame(tick);
+      }
       flushFx();
       maybeOpponentTurn();
     }
@@ -533,6 +563,45 @@
       setTimeout(() => b.remove(), 1500);
     }
 
+    /* Turn change: a wipe with the duelist's portrait. */
+    function turnWipe(p) {
+      document.querySelectorAll('.turn-wipe').forEach((x) => x.remove());
+      const w = document.createElement('div');
+      w.className = 'turn-wipe ' + (p === 0 ? 'mine' : 'theirs');
+      const av = p === 0 ? App.characters.avatar('you', 'big') : s.character ? App.characters.avatar(s.character, 'big') : '<span class="avatar big avatar-you">' + (s.oppType === 'claude' ? '✦' : '🤖') + '</span>';
+      w.innerHTML = '<div class="tw-band">' + av + '<div class="tw-text"><small>Turn ' + duel.turn + '</small><strong>' + esc(p === 0 ? 'Your Turn' : duel.pname(1) + '\'s Turn') + '</strong></div></div>';
+      document.body.appendChild(w);
+      App.characters.paintArt(w);
+      setTimeout(() => w.remove(), speed > 150 ? 1400 : 700);
+    }
+
+    /* LP counters roll from the old value to the new one. */
+    function rollLp() {
+      s.lpShown = s.lpShown || duel.players.map((x) => x.lp);
+      duel.players.forEach((pl, p) => {
+        const box = document.getElementById('lp-' + p);
+        if (!box) return;
+        const from = s.lpShown[p];
+        const to = pl.lp;
+        if (from === to) return;
+        s.lpShown[p] = to;
+        const small = box.querySelector('small') ? box.querySelector('small').outerHTML : '';
+        const t0 = performance.now();
+        const dur = speed > 150 ? 650 : 250;
+        box.classList.add('rolling');
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / dur);
+          const v = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+          const b = document.getElementById('lp-' + p);
+          if (!b) return;
+          b.innerHTML = v + small;
+          if (k < 1) requestAnimationFrame(step); else b.classList.remove('rolling');
+        };
+        box.innerHTML = from + small;
+        requestAnimationFrame(step);
+      });
+    }
+
     function floatNumber(p, text, kind) {
       const box = document.getElementById('lp-' + p);
       if (!box) return;
@@ -579,8 +648,14 @@
     duel.onFx((type, d) => {
       App.sound.play(type, d);
       switch (type) {
-        case 'summon': s.fxQueue.push({ uid: d.uid, cls: d.tribute ? 'fx-special' : 'fx-summon' }); break;
-        case 'special': s.fxQueue.push({ uid: d.uid, cls: d.extra ? 'fx-special' : 'fx-summon' }); if (d.extra && d.how) banner(d.how + '!', 'summon'); break;
+        case 'summon':
+          s.fxQueue.push({ uid: d.uid, cls: d.tribute ? 'fx-special' : 'fx-summon' });
+          if (d.tribute && speed > 150) { const l = duel.find(d.uid); if (l) App.game.cutIn(l.card, d.player, 'Tribute Summon'); }
+          break;
+        case 'special':
+          s.fxQueue.push({ uid: d.uid, cls: d.extra ? 'fx-special' : 'fx-summon' });
+          if (d.extra && speed > 150) { const l = duel.find(d.uid); if (l) App.game.cutIn(l.card, d.player, (d.how || 'Special Summon')); } else if (d.extra && d.how) banner(d.how + '!', 'summon');
+          break;
         case 'set': s.fxQueue.push({ uid: d.uid, cls: 'fx-set' }); break;
         case 'activate': s.fxQueue.push({ uid: d.uid, cls: 'fx-activate' }); break;
         case 'draw': if (d.player === 0) s.fxQueue.push({ run: () => { const cards = root.querySelectorAll('.hand-row.mine .card-slot'); for (let i = Math.max(0, cards.length - d.count); i < cards.length; i++) cards[i].classList.add('fx-draw'); } }); break;
@@ -593,7 +668,7 @@
           break;
         case 'gain': floatNumber(d.player, '+' + d.amount, 'heal'); break;
         case 'phase': if (d.phase === 'battle') banner('Battle Phase', 'battle'); break;
-        case 'turn': banner(d.player === 0 ? 'Your Turn' : d.name + '\'s Turn', d.player === 0 ? 'mine' : 'theirs'); break;
+        case 'turn': turnWipe(d.player); break;
         case 'win': banner('Victory!', 'win'); break;
         case 'lose': banner('Defeat', 'lose'); break;
         default: break;

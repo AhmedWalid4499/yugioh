@@ -109,6 +109,25 @@ function apiResponse(url) {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => location.hash === '#/home');
   check(true, 'Esc goes back to the main menu');
+  check((await page.textContent('#dp-badge')).trim() === '1,000 DP', 'you start with 1,000 Duel Points');
+
+  console.log('Card Shop');
+  await page.goto(URL_BASE + '#/shop');
+  await page.waitForSelector('.pack-tile[data-set="Legend of Blue Eyes White Dragon"]');
+  await page.click('.pack-tile[data-set="Legend of Blue Eyes White Dragon"]');
+  await page.waitForSelector('.po-pack');
+  check(true, 'buying a pack shows the pack');
+  await page.click('.po-pack', { force: true });
+  await page.waitForSelector('.po-cards:not([hidden]) .po-card');
+  check((await page.locator('.po-card').count()) === 9, 'tearing it open deals 9 cards');
+  await page.click('#po-all', { force: true });
+  await page.waitForSelector('#po-done:not([hidden])');
+  check((await page.locator('.po-card.flipped').count()) === 9, '"Reveal all" flips every card');
+  await page.click('#po-done', { force: true });
+  await page.waitForSelector('.pack-open', { state: 'detached' });
+  check((await page.textContent('#dp-badge')).trim() === '800 DP', 'the pack cost 200 DP');
+  await page.goto(URL_BASE + '#/shop?tab=binder');
+  check((await page.locator('.binder-card').count()) >= 1, 'the cards are in your binder');
   await page.goto(URL_BASE + '#/help');
   check((await page.locator('.glossary dt').count()) >= 10 && (await page.locator('#help-duel .help-steps').count()) === 1, 'Help page explains duels and Yu-Gi-Oh! words');
 
@@ -362,6 +381,7 @@ function apiResponse(url) {
   console.log('Famous duelists');
   await page.goto(URL_BASE + '#/duel');
   await page.waitForSelector('.char-tile');
+  check((await page.locator('.char-tile[data-char="marik"]').count()) === 1 && (await page.locator('.char-tile[data-char="bakura"]').count()) === 1, 'Marik and Bakura are rivals');
   check((await page.locator('.char-tile').count()) >= 26 && (await page.locator('.char-tile[data-char="zarc"]').count()) === 1 && (await page.locator('.char-tile[data-char="ai"]').count()) === 1, 'the rival select offers every famous duelist, including Zarc and Ai');
   await page.click('[data-series="VRAINS"]');
   check(await page.isHidden('.char-tile[data-char="yugi"]') && await page.isVisible('.char-tile[data-char="ai"]'), 'series tabs filter the rivals');
